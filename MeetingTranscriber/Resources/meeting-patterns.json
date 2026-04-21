@@ -1,0 +1,44 @@
+{
+  "patterns": [
+    {
+      "name": "Google Meet",
+      "regex": "meet\\.google\\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Zoom",
+      "regex": "zoom\\.us/(j|wc|w)/[0-9]+",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Microsoft Teams",
+      "regex": "teams\\.(microsoft|live)\\.com/.+/meetup-join",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Microsoft Teams Live",
+      "regex": "teams\\.(microsoft|live)\\.com/v2/",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Whereby",
+      "regex": "whereby\\.com/[a-zA-Z0-9_-]+",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Gather",
+      "regex": "app\\.gather\\.town/",
+      "icon": "person.3.fill"
+    },
+    {
+      "name": "Around",
+      "regex": "meet\\.around\\.co/",
+      "icon": "video.fill"
+    },
+    {
+      "name": "Jitsi",
+      "regex": "meet\\.jit\\.si/",
+      "icon": "video.fill"
+    }
+  ]
+}

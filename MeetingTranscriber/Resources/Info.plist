@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Meeting Transcriber</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Meeting Transcriber</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Meeting Transcriber asks Arc, Safari, and Chrome for the current tab URL to detect meetings you join.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Needed only if you import files from the Desktop.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Meeting Transcriber saves transcripts to your Documents folder.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Needed only if you import files from Downloads.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Romuald Członkowski</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Meeting Transcriber records your microphone while you record a meeting.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<true/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>

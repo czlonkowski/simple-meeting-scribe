@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Xcode / SPM build output
+build/
+DerivedData/
+*.xcodeproj/
+.swiftpm/
+xcuserdata/
+Package.resolved
+
+# Generated app icons (regenerate with scripts/generate_app_icon.swift)
+MeetingTranscriber/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png
+
+# Local agent / assistant working directories
+.agents/
+.claude/
+skills-lock.json
+
+# Release output
+dist/
+*.dmg
