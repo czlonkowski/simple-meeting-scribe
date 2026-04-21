@@ -69,6 +69,55 @@ xcodebuild -project MeetingTranscriber.xcodeproj \
 Run the app from `~/Library/Developer/Xcode/DerivedData/.../Debug/MeetingTranscriber.app`,
 or copy it into `/Applications` with `sudo cp -R …`.
 
+## …or let an AI coding agent install it for you
+
+If you already use [Claude Code](https://claude.com/claude-code), Codex, or a
+similar coding agent, paste this prompt into it and let it do the work. You'll
+still need to approve Xcode / Homebrew / sudo prompts as they come up.
+
+> ```
+> Please install Simple Meeting Scribe on this Mac. It's a SwiftUI app
+> at https://github.com/czlonkowski/simple-meeting-scribe. Do this end
+> to end:
+>
+> 1. Verify prerequisites: Apple Silicon, macOS 26 or newer, Xcode 16+
+>    installed. If Xcode Command Line Tools aren't installed, run
+>    `xcode-select --install` and wait for it to finish.
+> 2. Install xcodegen if missing: `brew install xcodegen` (install
+>    Homebrew first with the official script if it's not there).
+> 3. Pre-download the Metal Toolchain so the build doesn't stall on it:
+>    `xcodebuild -downloadComponent MetalToolchain`
+> 4. Clone the repo into ~/Developer (create the directory if needed)
+>    and `cd` into it:
+>    `git clone https://github.com/czlonkowski/simple-meeting-scribe
+>    ~/Developer/simple-meeting-scribe && cd ~/Developer/simple-meeting-scribe`
+> 5. Generate the Xcode project: `xcodegen generate`
+> 6. Build Release:
+>    `xcodebuild -project MeetingTranscriber.xcodeproj
+>    -scheme MeetingTranscriber -configuration Release
+>    -destination 'platform=macOS' -skipMacroValidation
+>    -derivedDataPath build build`
+> 7. Install to /Applications (this needs sudo — ask me to run it if you
+>    can't):
+>    `sudo rm -rf /Applications/MeetingTranscriber.app &&
+>     sudo cp -R build/Build/Products/Release/MeetingTranscriber.app
+>     /Applications/ &&
+>     sudo /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+>     -f /Applications/MeetingTranscriber.app`
+> 8. Open the app from /Applications once so macOS can register it, then
+>    tell me:
+>    - to grant Microphone + Screen Recording when prompted,
+>    - to approve Automation access for Arc / Safari / Chrome on first
+>      meeting detection,
+>    - to open Settings → Summary → Model Library and download a model
+>      before the first summarize (Qwen3.5-4B 8-bit for English,
+>      Bielik-11B v3 for Polish are the defaults).
+>
+> If any step fails, stop and show me the exact error — don't paper
+> over it. If a step asks for sudo, run it only once and with my
+> permission.
+> ```
+
 > **Why `-skipMacroValidation`?** MLX Swift LM ships compiler-plugin macros
 > (`#hubDownloader`, `#huggingFaceTokenizerLoader`). Xcode prompts to trust
 > them on first use. The CLI flag skips that prompt. In Xcode GUI, click
