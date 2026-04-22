@@ -8,6 +8,7 @@ struct MenuBarMenu: View {
     var body: some View {
         // State summary
         Text(stateLine)
+        if let queueLine { Text(queueLine).foregroundStyle(.secondary) }
         Divider()
 
         switch state.recordingState {
@@ -26,7 +27,7 @@ struct MenuBarMenu: View {
                 state.setMicMuted(!state.isMicMuted)
             }
             .keyboardShortcut("m", modifiers: [.command, .shift])
-        case .preparing, .stopping, .processing:
+        case .preparing, .stopping:
             EmptyView()
         }
 
@@ -69,8 +70,14 @@ struct MenuBarMenu: View {
             return "\(who) · \(lang.displayName)"
         case .stopping:
             return "Stopping…"
-        case .processing(_, let stage):
-            return stage
         }
+    }
+
+    /// Secondary line shown under the main state summary when background
+    /// transcription is running, e.g. "Transcribing · +2 queued".
+    private var queueLine: String? {
+        guard state.isProcessing else { return nil }
+        let queued = state.queuedJobCount
+        return queued > 0 ? "Transcribing · +\(queued) queued" : "Transcribing"
     }
 }

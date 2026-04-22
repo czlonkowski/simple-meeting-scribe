@@ -13,7 +13,9 @@ final class RecordingCoordinator {
     private var writer: StemWriter?
     private var captureSystem = false
 
-    func start(captureSystemAudio: Bool, onLevel: @escaping (Float) -> Void) async throws {
+    func start(captureSystemAudio: Bool,
+               onMicLevel: @escaping (Float) -> Void,
+               onSystemLevel: @escaping (Float) -> Void) async throws {
         let baseURL = Self.makeBaseURL()
         let writer = try StemWriter(baseURL: baseURL)
         self.writer = writer
@@ -23,7 +25,7 @@ final class RecordingCoordinator {
             guard let writer else { return }
             await writer.appendMic(samples)
         }
-        mic.onLevel = { rms in onLevel(rms) }
+        mic.onLevel = onMicLevel
         try mic.start()
 
         if captureSystemAudio {
@@ -31,6 +33,7 @@ final class RecordingCoordinator {
                 guard let writer else { return }
                 await writer.appendSystem(samples)
             }
+            system.onLevel = onSystemLevel
             do {
                 try await system.start(preferredBundleID: "company.thebrowser.Browser")
             } catch {

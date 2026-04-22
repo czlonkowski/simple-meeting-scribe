@@ -41,7 +41,6 @@ struct RootView: View {
                     Label("Import File", systemImage: "tray.and.arrow.down")
                 }
                 .help("Import an audio or video file for transcription")
-                .disabled(state.recordingState.isBusy)
             }
             ToolbarItem(placement: .primaryAction) {
                 SettingsLink {
@@ -113,8 +112,7 @@ struct RootView: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard case .idle = appState.recordingState,
-                  let first = urls.first else { return false }
+            guard let first = urls.first else { return false }
             pendingImportURL = first
             return true
         }

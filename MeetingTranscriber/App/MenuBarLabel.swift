@@ -7,7 +7,11 @@ struct MenuBarLabel: View {
     var body: some View {
         switch state.recordingState {
         case .idle:
-            Image(systemName: "waveform.circle")
+            if state.isProcessing {
+                Image(systemName: "gear.badge")
+            } else {
+                Image(systemName: "waveform.circle")
+            }
         case .preparing:
             Image(systemName: "circle.dotted")
         case .recording:
@@ -20,8 +24,6 @@ struct MenuBarLabel: View {
             }
         case .stopping:
             Image(systemName: "stop.circle")
-        case .processing:
-            Image(systemName: "gear.badge")
         }
     }
 

@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import ScreenCaptureKit
 import CoreMedia
+import Accelerate
 
 /// Captures system audio from the main display using ScreenCaptureKit.
 /// Delivers resampled 16 kHz mono f32 samples to the consumer.
@@ -11,8 +12,10 @@ import CoreMedia
 /// only — no `.screen` or `.microphone` output types.
 final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate {
     typealias SampleConsumer = ([Float]) async -> Void
+    typealias LevelConsumer = (Float) -> Void
 
     var onSamples: SampleConsumer?
+    var onLevel: LevelConsumer?
 
     private var stream: SCStream?
     private let targetFormat: AVAudioFormat = AVAudioFormat(
@@ -122,6 +125,11 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         guard status != .error, let ch = outputPCM.floatChannelData?[0] else { return }
         let count = Int(outputPCM.frameLength)
         guard count > 0 else { return }
+
+        var rms: Float = 0
+        vDSP_rmsqv(ch, 1, &rms, vDSP_Length(count))
+        DispatchQueue.main.async { [weak self] in self?.onLevel?(rms) }
+
         let samples = Array(UnsafeBufferPointer(start: ch, count: count))
         sampleCount += count
         if sampleCount == count || sampleCount % (16_000 * 5) < count {

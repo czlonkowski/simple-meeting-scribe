@@ -11,6 +11,9 @@ struct RecordView: View {
                 header
                 stateCard
                 controls
+                if appState.isProcessing {
+                    processingPanel
+                }
                 Spacer(minLength: 0)
             }
             .padding(28)
@@ -51,8 +54,6 @@ struct RecordView: View {
                         ProgressView().controlSize(.small)
                         Text("Stopping…").foregroundStyle(.secondary)
                     }
-                case .processing(let progress, let stage):
-                    processingCenter(progress: progress, stage: stage)
                 }
             }
             .frame(minHeight: 200)
@@ -109,33 +110,65 @@ struct RecordView: View {
             }
             .font(.headline)
 
-            levelMeter
-        }
-    }
-
-    private var levelMeter: some View {
-        GeometryReader { geo in
-            let width = CGFloat(max(0, min(1, Double(appState.currentLevelRMS) * 6))) * geo.size.width
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.primary.opacity(0.08))
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(LinearGradient(colors: [.green, .yellow, .orange, Theme.accent],
-                                         startPoint: .leading, endPoint: .trailing))
-                    .frame(width: width)
-                    .animation(.easeOut(duration: 0.08), value: width)
+            VStack(spacing: 10) {
+                LevelMeterRow(label: "Mic",
+                              systemImage: appState.isMicMuted ? "mic.slash.fill" : "mic.fill",
+                              level: appState.isMicMuted ? 0 : appState.currentMicRMS,
+                              muted: appState.isMicMuted)
+                if appState.captureSystemAudio {
+                    LevelMeterRow(label: "System",
+                                  systemImage: "speaker.wave.2.fill",
+                                  level: appState.currentSystemRMS,
+                                  muted: false)
+                }
             }
         }
-        .frame(height: 8)
     }
 
+    // MARK: – Processing queue panel (shown below the state card)
     @ViewBuilder
-    private func processingCenter(progress: Double, stage: String) -> some View {
-        VStack(spacing: 14) {
-            Text(stage).font(.headline)
-            ProgressView(value: progress)
-                .progressViewStyle(.linear)
-                .frame(maxWidth: 320)
+    private var processingPanel: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform.path")
+                        .foregroundStyle(.secondary)
+                    Text("Transcribing in background")
+                        .font(.headline)
+                    Spacer()
+                    if appState.queuedJobCount > 0 {
+                        Text("+\(appState.queuedJobCount) queued")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                    }
+                }
+
+                if let job = appState.activeJob,
+                   case .running(let progress, let stage) = job.stage {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(job.title)
+                                .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
+                            Spacer()
+                            Text(stage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Queued…").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -210,5 +243,62 @@ struct RecordView: View {
         return h > 0
             ? String(format: "%d:%02d:%02d", h, m, sec)
             : String(format: "%d:%02d", m, sec)
+    }
+}
+
+/// Classic LED-style VU meter. One row of vertical segments filling
+/// left-to-right as the RMS rises: green (safe) → yellow (loud) → red (peak).
+private struct LevelMeterRow: View {
+    let label: String
+    let systemImage: String
+    /// Raw RMS from the capture path (roughly 0…0.3 for speech, much higher
+    /// when the source is clipping). Scaled up by `gain` before mapping to
+    /// segments, so a 0.15 RMS lights most of the green zone.
+    let level: Float
+    let muted: Bool
+
+    private let segmentCount = 20
+    private let gain: Float = 6
+    /// Fraction of segments that burn green / yellow — the remainder is red.
+    private let greenFraction: Float = 0.65
+    private let yellowFraction: Float = 0.85
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Label(label, systemImage: systemImage)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(muted ? Color.orange : .secondary)
+                .frame(width: 78, alignment: .leading)
+
+            GeometryReader { geo in
+                let spacing: CGFloat = 3
+                let totalSpacing = spacing * CGFloat(segmentCount - 1)
+                let segmentWidth = max(2, (geo.size.width - totalSpacing) / CGFloat(segmentCount))
+                let scaled = min(1, max(0, Double(level * gain)))
+                let litCount = Int((scaled * Double(segmentCount)).rounded())
+
+                HStack(spacing: spacing) {
+                    ForEach(0..<segmentCount, id: \.self) { idx in
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(color(for: idx, litCount: litCount))
+                            .frame(width: segmentWidth)
+                    }
+                }
+                .animation(.easeOut(duration: 0.08), value: litCount)
+            }
+            .frame(height: 12)
+        }
+    }
+
+    private func color(for index: Int, litCount: Int) -> Color {
+        let lit = index < litCount
+        let position = Float(index) / Float(segmentCount - 1)
+        let hot: Color
+        switch position {
+        case ..<greenFraction:    hot = .green
+        case ..<yellowFraction:   hot = .yellow
+        default:                  hot = .red
+        }
+        return lit ? hot : Color.primary.opacity(0.08)
     }
 }

@@ -393,20 +393,82 @@ final class AppState {
     }
 
     // MARK: – Recording state
+    /// Recording lifecycle only — transcription runs off on `processingJobs`
+    /// so a new recording can start while a previous one is still being
+    /// transcribed.
     enum RecordingState: Equatable {
         case idle
         case preparing
         case recording(startedAt: Date, meeting: DetectedMeeting?, language: TranscriptionLanguage)
         case stopping
-        case processing(progress: Double, stage: String)
 
         var isRecording: Bool { if case .recording = self { return true } else { return false } }
+        /// True whenever the recorder itself is doing something (start, mid-record, stop).
+        /// Does NOT reflect background transcription — see `isProcessing`.
         var isBusy: Bool { if case .idle = self { return false } else { return true } }
     }
     var recordingState: RecordingState = .idle
     var elapsedSeconds: Int = 0
-    var currentLevelRMS: Float = 0
+    /// RMS of the mic stream (0–1ish).
+    var currentMicRMS: Float = 0
+    /// RMS of the system-audio stream (0–1ish). Stays 0 when system capture
+    /// is disabled or no audio is playing through the captured display.
+    var currentSystemRMS: Float = 0
     var isMicMuted: Bool = false
+
+    // MARK: – Background processing queue
+    /// One transcription job — either a freshly captured recording or an
+    /// imported media file. Jobs run serially on a single background drain
+    /// task so a new recording can begin as soon as the previous one stops.
+    struct ProcessingJob: Identifiable, Equatable {
+        enum Input: Equatable {
+            /// Stems already on disk (from RecordingCoordinator).
+            case liveStems(voiceURL: URL, systemURL: URL?, duration: TimeInterval)
+            /// User-imported media; needs decode → mono 16kHz WAV first.
+            case importFile(sourceURL: URL)
+        }
+        enum Stage: Equatable {
+            case queued
+            case running(progress: Double, stage: String)
+            case failed(String)
+
+            var isQueued: Bool { if case .queued = self { return true } else { return false } }
+            var isRunning: Bool { if case .running = self { return true } else { return false } }
+        }
+        let id: UUID
+        /// Short human label for the queue panel (meeting title, "Recording — hh:mm", or filename).
+        let title: String
+        let input: Input
+        let language: TranscriptionLanguage
+        let meeting: DetectedMeeting?
+        let sourceKind: TranscriptDocument.SourceKind
+        let importedName: String?
+        /// When set, this job re-transcribes an existing document's stems and
+        /// overwrites that document in place (preserving the id + title,
+        /// clearing any now-stale summary).
+        let replacingDocumentID: String?
+        /// Forces a specific Whisper model for this job regardless of the
+        /// user's global `selectedModel`. Used by Re-transcribe.
+        let modelOverride: WhisperModel?
+        var stage: Stage
+        let createdAt: Date
+    }
+
+    var processingJobs: [ProcessingJob] = []
+    private var processingTask: Task<Void, Never>?
+
+    /// True when at least one job is queued or running.
+    var isProcessing: Bool { !processingJobs.isEmpty }
+
+    /// The job currently running (if any) — used by the UI to show a single
+    /// progress line and the "+N queued" badge.
+    var activeJob: ProcessingJob? {
+        processingJobs.first(where: { $0.stage.isRunning })
+    }
+
+    var queuedJobCount: Int {
+        processingJobs.filter { $0.stage.isQueued }.count
+    }
 
     // MARK: – Meeting detection (sheet is item-driven off this)
     var detectedMeeting: DetectedMeeting? = nil
@@ -469,12 +531,20 @@ final class AppState {
     func startRecording(language: TranscriptionLanguage, meeting: DetectedMeeting?) async {
         guard case .idle = recordingState else { return }
         recordingState = .preparing
+        currentMicRMS = 0
+        currentSystemRMS = 0
         let coord = RecordingCoordinator()
         self.recorder = coord
         do {
-            try await coord.start(captureSystemAudio: captureSystemAudio) { [weak self] rms in
-                Task { @MainActor in self?.currentLevelRMS = rms }
-            }
+            try await coord.start(
+                captureSystemAudio: captureSystemAudio,
+                onMicLevel: { [weak self] rms in
+                    Task { @MainActor in self?.currentMicRMS = rms }
+                },
+                onSystemLevel: { [weak self] rms in
+                    Task { @MainActor in self?.currentSystemRMS = rms }
+                }
+            )
             let start = Date()
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0
@@ -497,20 +567,31 @@ final class AppState {
         recordingState = .stopping
         stopElapsedTimer()
         guard let recorder = recorder else { recordingState = .idle; return }
+        defer { self.recorder = nil }
         do {
             let stems = try await recorder.stop()
             let duration = Date().timeIntervalSince(startedAt)
-            await runPipeline(voiceURL: stems.voiceURL,
-                              systemURL: stems.systemURL,
-                              duration: duration,
-                              language: language,
-                              meeting: meeting,
-                              sourceKind: .live)
+            let job = ProcessingJob(
+                id: UUID(),
+                title: jobTitle(for: meeting, startedAt: startedAt),
+                input: .liveStems(voiceURL: stems.voiceURL,
+                                  systemURL: stems.systemURL,
+                                  duration: duration),
+                language: language,
+                meeting: meeting,
+                sourceKind: .live,
+                importedName: nil,
+                replacingDocumentID: nil,
+                modelOverride: nil,
+                stage: .queued,
+                createdAt: Date()
+            )
+            enqueueJob(job)
+            recordingState = .idle
         } catch {
             recordingState = .idle
             lastError = "Stop failed: \(error.localizedDescription)"
         }
-        self.recorder = nil
     }
 
     private func startElapsedTimer(from start: Date) {
@@ -531,70 +612,202 @@ final class AppState {
     }
 
     // MARK: – Import path
+    /// Enqueues an import job. Unlike recording, imports don't touch
+    /// `recordingState` — they can be added to the queue while a recording is
+    /// in progress or other jobs are processing.
     func importFile(url sourceURL: URL, language: TranscriptionLanguage) async {
-        guard case .idle = recordingState else { return }
-        recordingState = .processing(progress: 0.0, stage: "Decoding audio")
-        do {
-            let wavURL = try await MediaImporter.convertToMono16kWav(source: sourceURL) { [weak self] fraction in
-                Task { @MainActor in
-                    self?.recordingState = .processing(progress: fraction * 0.2,
-                                                       stage: "Decoding audio")
-                }
+        let job = ProcessingJob(
+            id: UUID(),
+            title: sourceURL.lastPathComponent,
+            input: .importFile(sourceURL: sourceURL),
+            language: language,
+            meeting: nil,
+            sourceKind: .imported,
+            importedName: sourceURL.lastPathComponent,
+            replacingDocumentID: nil,
+            modelOverride: nil,
+            stage: .queued,
+            createdAt: Date()
+        )
+        enqueueJob(job)
+    }
+
+    // MARK: – Re-transcribe an existing document
+
+    /// Enqueue a re-transcription of an existing document's stems with the
+    /// given model. Preserves the title, clears the stale summary + action
+    /// items, and runs diarization fresh (speaker renames will be lost).
+    /// No-op if the document has no voice stem on disk, or if a
+    /// re-transcription is already in flight for this document.
+    func retranscribe(documentID: String, with model: WhisperModel) {
+        guard let doc = transcripts.first(where: { $0.id == documentID }) else { return }
+        guard let voiceURL = TranscriptStore.shared.audioURL(for: doc) else {
+            lastError = "Can't re-transcribe: audio file is missing."
+            return
+        }
+        // Already queued or running? Leave it alone.
+        if processingJobs.contains(where: { $0.replacingDocumentID == documentID }) { return }
+
+        let systemURL = TranscriptStore.shared.systemAudioURL(for: doc)
+        let job = ProcessingJob(
+            id: UUID(),
+            title: "\(doc.title) · \(model.shortName)",
+            input: .liveStems(voiceURL: voiceURL,
+                              systemURL: systemURL,
+                              duration: doc.duration),
+            language: doc.language,
+            meeting: nil,
+            sourceKind: doc.sourceKind,
+            importedName: doc.sourceKind == .imported ? doc.sourceURL : nil,
+            replacingDocumentID: documentID,
+            modelOverride: model,
+            stage: .queued,
+            createdAt: Date()
+        )
+        enqueueJob(job)
+    }
+
+    // MARK: – Processing queue
+
+    private func enqueueJob(_ job: ProcessingJob) {
+        processingJobs.append(job)
+        startProcessingDrainIfNeeded()
+    }
+
+    private func startProcessingDrainIfNeeded() {
+        guard processingTask == nil else { return }
+        processingTask = Task { @MainActor [weak self] in
+            while let self, let job = self.nextQueuedJob() {
+                await self.processJob(job)
             }
-            let duration = try await MediaImporter.duration(of: sourceURL)
-            // Imports: treat the whole file as a single "voice" stem (no system split).
-            await runPipeline(voiceURL: wavURL,
-                              systemURL: nil,
-                              duration: duration,
-                              language: language,
-                              meeting: nil,
-                              sourceKind: .imported,
-                              importedName: sourceURL.lastPathComponent,
-                              progressOffset: 0.2)
-        } catch {
-            recordingState = .idle
-            lastError = "Import failed: \(error.localizedDescription)"
+            self?.processingTask = nil
         }
     }
 
-    private func runPipeline(voiceURL: URL,
-                             systemURL: URL?,
-                             duration: TimeInterval,
-                             language: TranscriptionLanguage,
-                             meeting: DetectedMeeting?,
-                             sourceKind: TranscriptDocument.SourceKind,
-                             importedName: String? = nil,
-                             progressOffset: Double = 0.0) async {
-        recordingState = .processing(progress: progressOffset + 0.05, stage: "Loading Whisper")
-        let pipeline = TranscriptionPipeline()
+    private func nextQueuedJob() -> ProcessingJob? {
+        processingJobs.first(where: { $0.stage.isQueued })
+    }
+
+    private func updateJobStage(_ id: UUID, _ stage: ProcessingJob.Stage) {
+        guard let idx = processingJobs.firstIndex(where: { $0.id == id }) else { return }
+        processingJobs[idx].stage = stage
+    }
+
+    /// Run one job through decode (if needed) + WhisperKit + diarization.
+    /// Runs on the main actor; the heavy work is performed inside
+    /// `TranscriptionPipeline`, which uses its own actor-isolated engines, so
+    /// the UI stays responsive.
+    private func processJob(_ job: ProcessingJob) async {
+        let jobID = job.id
+        let language = job.language
+        let meeting = job.meeting
+        let sourceKind = job.sourceKind
+        let importedName = job.importedName
+
+        let voiceURL: URL
+        let systemURL: URL?
+        let duration: TimeInterval
+        let progressOffset: Double
+
         do {
+            switch job.input {
+            case .liveStems(let v, let s, let d):
+                voiceURL = v
+                systemURL = s
+                duration = d
+                progressOffset = 0.0
+            case .importFile(let src):
+                updateJobStage(jobID, .running(progress: 0.0, stage: "Decoding audio"))
+                let wavURL = try await MediaImporter.convertToMono16kWav(source: src) { [weak self] fraction in
+                    Task { @MainActor in
+                        self?.updateJobStage(jobID, .running(progress: fraction * 0.2,
+                                                             stage: "Decoding audio"))
+                    }
+                }
+                let dur = try await MediaImporter.duration(of: src)
+                voiceURL = wavURL
+                systemURL = nil
+                duration = dur
+                progressOffset = 0.2
+            }
+
+            updateJobStage(jobID, .running(progress: progressOffset + 0.05, stage: "Loading Whisper"))
+            let pipeline = TranscriptionPipeline()
             let progress: (Double, String) -> Void = { [weak self] p, s in
                 Task { @MainActor in
-                    self?.recordingState = .processing(
+                    self?.updateJobStage(jobID, .running(
                         progress: progressOffset + (1.0 - progressOffset) * p,
-                        stage: s)
+                        stage: s))
                 }
             }
             let prime = languagePrimes[language.rawValue] ?? ""
-            let doc = try await pipeline.run(voiceURL: voiceURL,
-                                             systemURL: systemURL,
-                                             duration: duration,
-                                             language: language,
-                                             model: selectedModel,
-                                             meeting: meeting,
-                                             sourceKind: sourceKind,
-                                             importedFileName: importedName,
-                                             initialPrompt: prime.isEmpty ? nil : prime,
-                                             wordReplacements: wordReplacements,
-                                             progress: progress)
-            try TranscriptStore.shared.save(doc, audioSource: voiceURL)
+            let model = job.modelOverride ?? selectedModel
+            let freshDoc = try await pipeline.run(voiceURL: voiceURL,
+                                                  systemURL: systemURL,
+                                                  duration: duration,
+                                                  language: language,
+                                                  model: model,
+                                                  meeting: meeting,
+                                                  sourceKind: sourceKind,
+                                                  importedFileName: importedName,
+                                                  initialPrompt: prime.isEmpty ? nil : prime,
+                                                  wordReplacements: wordReplacements,
+                                                  progress: progress)
+
+            // For re-transcription, preserve the existing document's identity
+            // (id, title, date, audio filename, source) and overlay the fresh
+            // transcription output (new model, segments, speakers, duration).
+            // The stale summary is dropped — it was built against the old
+            // segments and no longer matches.
+            let docToSave: TranscriptDocument
+            if let replaceID = job.replacingDocumentID,
+               let existing = transcripts.first(where: { $0.id == replaceID }) {
+                docToSave = Self.applyRetranscription(to: existing, from: freshDoc)
+            } else {
+                docToSave = freshDoc
+            }
+            try TranscriptStore.shared.save(docToSave, audioSource: voiceURL)
             await loadTranscripts()
-            selectedTranscriptID = doc.id
-            recordingState = .idle
+            selectedTranscriptID = docToSave.id
+            processingJobs.removeAll { $0.id == jobID }
         } catch {
             lastError = "Transcription failed: \(error.localizedDescription)"
-            recordingState = .idle
+            // Drop the failed job from the queue so the drain continues.
+            processingJobs.removeAll { $0.id == jobID }
         }
+    }
+
+    /// Build the document we'll save after re-transcribing `existing`. Keeps
+    /// every "identity" field (id, title, date, stored audio, source) and
+    /// everything the user may have edited, while adopting the fresh Whisper
+    /// output (model, duration, speakers, segments). A handful of fields are
+    /// `let`, so this has to be a field-by-field init rather than a mutation.
+    private static func applyRetranscription(to existing: TranscriptDocument,
+                                             from fresh: TranscriptDocument) -> TranscriptDocument {
+        TranscriptDocument(
+            id: existing.id,
+            title: existing.title,
+            date: existing.date,
+            duration: fresh.duration,
+            language: fresh.language,
+            modelShortName: fresh.modelShortName,
+            sourceURL: existing.sourceURL,
+            sourceKind: existing.sourceKind,
+            speakers: fresh.speakers,
+            segments: fresh.segments,
+            audioFileName: existing.audioFileName,
+            summary: nil,
+            actionItems: nil,
+            summaryModelShortName: nil,
+            summaryGeneratedAt: nil
+        )
+    }
+
+    private func jobTitle(for meeting: DetectedMeeting?, startedAt: Date) -> String {
+        if let meeting { return meeting.title }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return "Recording — \(fmt.string(from: startedAt))"
     }
 
     // MARK: – Transcript deletion

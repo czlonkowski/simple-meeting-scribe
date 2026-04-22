@@ -15,6 +15,27 @@ final class TranscriptStore {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    /// Resolve the paired system-audio stem for a live recording. Only
+    /// transcripts captured through `RecordingCoordinator` (which writes
+    /// `<base>.voice.wav` + `<base>.system.wav`) have one — imported files
+    /// return nil. The player uses this to layer the remote party on top of
+    /// the mic at playback time.
+    func systemAudioURL(for doc: TranscriptDocument) -> URL? {
+        guard let name = doc.audioFileName,
+              let url = pairedSystemURL(forVoiceFilename: name) else { return nil }
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// Derive the path of the `<base>.system.wav` stem paired with a voice
+    /// filename of the form `<base>.voice.wav`. Returns nil for anything that
+    /// isn't a live-recording stem.
+    private func pairedSystemURL(forVoiceFilename voice: String) -> URL? {
+        let withoutWav = (voice as NSString).deletingPathExtension      // "...voice"
+        guard withoutWav.hasSuffix(".voice") else { return nil }
+        let stem = String(withoutWav.dropLast(".voice".count))
+        return recordingsDir.appendingPathComponent("\(stem).system.wav")
+    }
+
     /// Remove every file belonging to a transcript — markdown, JSON, and the
     /// paired `.voice.wav` / `.system.wav` recordings. Missing files are
     /// silently skipped so the call is idempotent.
@@ -26,13 +47,10 @@ final class TranscriptStore {
         try? fm.removeItem(at: json)
 
         if let voice = doc.audioFileName {
-            let voiceURL = recordingsDir.appendingPathComponent(voice)
-            try? fm.removeItem(at: voiceURL)
-            // Paired system stem shares the base filename with a `.system.wav` suffix.
-            let base = (voice as NSString).deletingPathExtension      // "2026-04-21_141234.voice"
-            let stem = (base as NSString).deletingPathExtension       // "2026-04-21_141234"
-            let systemURL = recordingsDir.appendingPathComponent("\(stem).system.wav")
-            try? fm.removeItem(at: systemURL)
+            try? fm.removeItem(at: recordingsDir.appendingPathComponent(voice))
+            if let systemURL = pairedSystemURL(forVoiceFilename: voice) {
+                try? fm.removeItem(at: systemURL)
+            }
         }
     }
 

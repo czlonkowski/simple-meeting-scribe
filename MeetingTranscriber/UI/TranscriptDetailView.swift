@@ -37,8 +37,9 @@ struct TranscriptDetailView: View {
     }
 
     private func loadAudioIfAvailable(for doc: TranscriptDocument) {
-        if let url = TranscriptStore.shared.audioURL(for: doc) {
-            audioPlayer.load(url: url)
+        if let voice = TranscriptStore.shared.audioURL(for: doc) {
+            let system = TranscriptStore.shared.systemAudioURL(for: doc)
+            audioPlayer.load(voiceURL: voice, systemURL: system)
         } else {
             audioPlayer.unload()
         }
@@ -73,7 +74,10 @@ struct TranscriptDetailView: View {
         HStack(alignment: .top) {
             headerTextBlock(for: doc)
             Spacer()
-            summarizeButton(for: doc)
+            VStack(alignment: .trailing, spacing: 6) {
+                summarizeButton(for: doc)
+                retranscribeButton(for: doc)
+            }
         }
     }
 
@@ -215,6 +219,53 @@ struct TranscriptDetailView: View {
                     customPromptPopover()
                 }
             }
+        }
+    }
+
+    // MARK: – Re-transcribe
+
+    /// Currently running re-transcription job for this document, if any —
+    /// lets the button flip into a progress state.
+    private var activeRetranscribeJob: AppState.ProcessingJob? {
+        appState.processingJobs.first(where: { $0.replacingDocumentID == documentID })
+    }
+
+    /// The Whisper model we'd upgrade to. Only offer a re-run when the
+    /// existing transcript used Turbo — there's no point downgrading to a
+    /// smaller model.
+    private func retranscribeTarget(for doc: TranscriptDocument) -> WhisperModel? {
+        doc.modelShortName == WhisperModel.largeV3Turbo.shortName ? .largeV3 : nil
+    }
+
+    @ViewBuilder
+    private func retranscribeButton(for doc: TranscriptDocument) -> some View {
+        if let target = retranscribeTarget(for: doc) {
+            if let job = activeRetranscribeJob {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text(retranscribeProgressLabel(for: job))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if TranscriptStore.shared.audioURL(for: doc) != nil {
+                Button {
+                    appState.retranscribe(documentID: documentID, with: target)
+                } label: {
+                    Label("Re-transcribe with \(target.shortName)",
+                          systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .help("Run transcription again with a larger model. Replaces segments and speakers; clears the summary.")
+            }
+        }
+    }
+
+    private func retranscribeProgressLabel(for job: AppState.ProcessingJob) -> String {
+        switch job.stage {
+        case .queued:                         return "Queued for re-transcription"
+        case .running(let p, let stage):      return "\(stage) · \(Int(p * 100))%"
+        case .failed(let msg):                return "Failed: \(msg)"
         }
     }
 
@@ -414,30 +465,36 @@ struct TranscriptDetailView: View {
     // MARK: – Transcript
     @ViewBuilder
     private func transcriptBlock(for doc: TranscriptDocument) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(.snappy) { transcriptExpanded.toggle() }
+                transcriptExpanded.toggle()
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 14)
                         .rotationEffect(.degrees(transcriptExpanded ? 90 : 0))
+                        .animation(.snappy(duration: 0.18), value: transcriptExpanded)
                     Text("Transcript").font(.headline)
                     Text("·").foregroundStyle(.tertiary)
                     Text("\(doc.segments.count) segment\(doc.segments.count == 1 ? "" : "s")")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .contentShape(Rectangle())
+                // Pad first, then set content shape so the hit area covers the
+                // padding — the old 13 pt strip was the root of the "click the
+                // chevron precisely" complaint.
+                .padding(.vertical, 10)
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(transcriptExpanded ? "Hide transcript" : "Show transcript")
+            .accessibilityAddTraits(.isHeader)
 
             if transcriptExpanded {
                 transcriptSegments(for: doc)
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
