@@ -102,6 +102,12 @@ struct RecordView: View {
                 }
                 Text("·").foregroundStyle(.tertiary)
                 Text("\(language.flag) \(language.displayName)")
+                if let mic = appState.currentInputDeviceName {
+                    Text("·").foregroundStyle(.tertiary)
+                    Label(mic, systemImage: "mic.fill")
+                        .labelStyle(.titleAndIcon)
+                        .foregroundStyle(.secondary)
+                }
                 if appState.isMicMuted {
                     Text("·").foregroundStyle(.tertiary)
                     Label("Mic muted", systemImage: "mic.slash.fill")

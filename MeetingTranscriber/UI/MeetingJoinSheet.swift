@@ -6,6 +6,7 @@ struct MeetingJoinSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        @Bindable var appState = appState
         VStack(spacing: 22) {
             VStack(spacing: 6) {
                 Image(systemName: "video.fill")
@@ -22,6 +23,18 @@ struct MeetingJoinSheet: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.top, 4)
+
+            VStack(spacing: 6) {
+                Text("Transcription engine")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Model", selection: $appState.selectedModel) {
+                    Text("Turbo").tag(WhisperModel.largeV3Turbo)
+                    Text("Large").tag(WhisperModel.largeV3)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
 
             VStack(spacing: 10) {
                 Text("Record this meeting in:")

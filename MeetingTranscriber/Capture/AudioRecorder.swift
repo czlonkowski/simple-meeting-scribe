@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Accelerate
+import CoreAudio
 
 /// Captures microphone audio via AVAudioEngine, downmixes + resamples to
 /// 16 kHz mono f32, and forwards to a consumer. Survives input device changes
@@ -27,6 +28,10 @@ final class AudioRecorder {
 
     var onSamples: SampleConsumer?
     var onLevel: LevelConsumer?
+    /// Fires on the main queue after the engine rebuilds in response to a
+    /// default-input-device change (AirPods ↔ built-in ↔ USB mic). Consumers
+    /// use this to re-read `AudioRecorder.currentInputDeviceName()`.
+    var onInputDeviceChange: (() -> Void)?
 
     func start() throws {
         guard !isRunning else { return }
@@ -121,9 +126,49 @@ final class AudioRecorder {
         do {
             try setupEngineAndTap()
             try engine.start()
+            // Re-install the observer on the fresh engine instance so further
+            // device swaps are still caught.
+            if let observer = configChangeObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            configChangeObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: engine,
+                queue: .main
+            ) { [weak self] _ in
+                self?.handleConfigurationChange()
+            }
+            onInputDeviceChange?()
         } catch {
             NSLog("AudioRecorder: restart after config change failed: \(error)")
             isRunning = false
         }
+    }
+
+    /// Human-readable name of the system default input device
+    /// (e.g. "MacBook Pro Microphone", "AirPods Pro"). Returns nil if
+    /// CoreAudio can't resolve it.
+    static func currentInputDeviceName() -> String? {
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &addr, 0, nil, &size, &deviceID
+        )
+        guard status == noErr, deviceID != 0 else { return nil }
+
+        // kAudioObjectPropertyName returns a retained CFString; use Unmanaged
+        // so ARC doesn't mishandle the reference CoreAudio hands back.
+        var nameRef: Unmanaged<CFString>?
+        size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        addr.mSelector = kAudioObjectPropertyName
+        status = AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &nameRef)
+        guard status == noErr, let name = nameRef?.takeRetainedValue() else { return nil }
+        return name as String
     }
 }

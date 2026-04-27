@@ -415,6 +415,10 @@ final class AppState {
     /// is disabled or no audio is playing through the captured display.
     var currentSystemRMS: Float = 0
     var isMicMuted: Bool = false
+    /// Human-readable name of the default input device while recording
+    /// (e.g. "MacBook Pro Microphone", "AirPods Pro"). Nil when not recording
+    /// or when CoreAudio can't resolve the device.
+    var currentInputDeviceName: String? = nil
 
     // MARK: – Background processing queue
     /// One transcription job — either a freshly captured recording or an
@@ -543,8 +547,14 @@ final class AppState {
                 },
                 onSystemLevel: { [weak self] rms in
                     Task { @MainActor in self?.currentSystemRMS = rms }
+                },
+                onInputDeviceChange: { [weak self] in
+                    Task { @MainActor in
+                        self?.currentInputDeviceName = AudioRecorder.currentInputDeviceName()
+                    }
                 }
             )
+            currentInputDeviceName = AudioRecorder.currentInputDeviceName()
             let start = Date()
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0
@@ -566,6 +576,7 @@ final class AppState {
         guard case .recording(let startedAt, let meeting, let language) = recordingState else { return }
         recordingState = .stopping
         stopElapsedTimer()
+        currentInputDeviceName = nil
         guard let recorder = recorder else { recordingState = .idle; return }
         defer { self.recorder = nil }
         do {

@@ -15,7 +15,8 @@ final class RecordingCoordinator {
 
     func start(captureSystemAudio: Bool,
                onMicLevel: @escaping (Float) -> Void,
-               onSystemLevel: @escaping (Float) -> Void) async throws {
+               onSystemLevel: @escaping (Float) -> Void,
+               onInputDeviceChange: (() -> Void)? = nil) async throws {
         let baseURL = Self.makeBaseURL()
         let writer = try StemWriter(baseURL: baseURL)
         self.writer = writer
@@ -26,6 +27,7 @@ final class RecordingCoordinator {
             await writer.appendMic(samples)
         }
         mic.onLevel = onMicLevel
+        mic.onInputDeviceChange = onInputDeviceChange
         try mic.start()
 
         if captureSystemAudio {

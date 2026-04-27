@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct TranscriptDetailView: View {
     let documentID: String
@@ -63,8 +64,11 @@ struct TranscriptDetailView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
-            copyButton(for: doc)
-                .padding(24)
+            HStack(spacing: 10) {
+                exportButton(for: doc)
+                copyButton(for: doc)
+            }
+            .padding(24)
         }
     }
 
@@ -560,6 +564,44 @@ struct TranscriptDetailView: View {
             try? await Task.sleep(for: .milliseconds(1600))
             withAnimation(.snappy) { justCopied = false }
         }
+    }
+
+    // MARK: – Export button (save .md to disk)
+    private func exportButton(for doc: TranscriptDocument) -> some View {
+        Button {
+            exportMarkdown(doc)
+        } label: {
+            Label("Save as .md…", systemImage: "square.and.arrow.down.fill")
+                .padding(.horizontal, 8)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .tint(.accentColor)
+        .keyboardShortcut("e", modifiers: [.command, .shift])
+    }
+
+    private func exportMarkdown(_ doc: TranscriptDocument) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.init(filenameExtension: "md") ?? .plainText]
+        panel.nameFieldStringValue = Self.sanitizeFilename(doc.title) + ".md"
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let md = TranscriptFormatter.renderMarkdown(doc)
+        do {
+            try md.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            appState.lastError = "Could not save Markdown: \(error.localizedDescription)"
+        }
+    }
+
+    /// Strip characters that confuse the filesystem so doc.title can be used
+    /// as a default filename. Falls back to "Transcript" for an empty result.
+    private static func sanitizeFilename(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let illegal = CharacterSet(charactersIn: "/:\\?%*|\"<>")
+        let cleaned = trimmed.components(separatedBy: illegal).joined(separator: "-")
+        return cleaned.isEmpty ? "Transcript" : cleaned
     }
 
     // MARK: – Helpers
