@@ -348,7 +348,7 @@ struct TranscriptDetailView: View {
                 case .generatingActions(let summary, let text):
                     Label("Summary", systemImage: "sparkles")
                         .font(.headline)
-                    Text(summary).textSelection(.enabled)
+                    Text(markdown: summary).textSelection(.enabled)
                     Divider()
                     Label("Action items", systemImage: "checklist")
                         .font(.headline)
@@ -357,12 +357,12 @@ struct TranscriptDetailView: View {
                 case .generatingTitle(let summary, let actions):
                     Label("Summary", systemImage: "sparkles")
                         .font(.headline)
-                    Text(summary).textSelection(.enabled)
+                    Text(markdown: summary).textSelection(.enabled)
                     if !actions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Divider()
                         Label("Action items", systemImage: "checklist")
                             .font(.headline)
-                        Text(actions).textSelection(.enabled)
+                        Text(markdown: actions).textSelection(.enabled)
                     }
                     Divider()
                     HStack(spacing: 8) {
@@ -385,7 +385,7 @@ struct TranscriptDetailView: View {
                 Text(placeholder).foregroundStyle(.secondary)
             }
         } else {
-            Text(text).textSelection(.enabled)
+            Text(markdown: text).textSelection(.enabled)
         }
     }
 
@@ -412,7 +412,7 @@ struct TranscriptDetailView: View {
                 }
 
                 if let summary = doc.summary, !summary.isEmpty {
-                    Text(summary).textSelection(.enabled)
+                    Text(markdown: summary).textSelection(.enabled)
                 }
                 if let actions = doc.actionItems, !actions.isEmpty {
                     Divider()
@@ -424,7 +424,7 @@ struct TranscriptDetailView: View {
                                 Image(systemName: "circle")
                                     .foregroundStyle(.tertiary)
                                     .imageScale(.small)
-                                Text(item).textSelection(.enabled)
+                                Text(markdown: item).textSelection(.enabled)
                             }
                         }
                     }
