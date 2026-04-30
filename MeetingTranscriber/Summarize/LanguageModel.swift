@@ -6,6 +6,7 @@ import Foundation
 enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
     case qwen3_5_4b_mlx_8bit      = "mlx-community/Qwen3.5-4B-8bit"
     case qwen3_5_9b_mlx_4bit      = "mlx-community/Qwen3.5-9B-MLX-4bit"
+    case bielik_11b_v3_mlx_8bit   = "speakleash/Bielik-11B-v3.0-Instruct-MLX-8bit"
     case bielik_11b_v3_mlx_4bit   = "speakleash/Bielik-11B-v3.0-Instruct-MLX-4bit"
     case bielik_4_5b_v3_mlx_8bit  = "speakleash/Bielik-4.5B-v3.0-Instruct-MLX-8bit"
 
@@ -16,7 +17,8 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .qwen3_5_4b_mlx_8bit:     "Qwen3.5-4B 8-bit (English, ~1.5 GB)"
         case .qwen3_5_9b_mlx_4bit:     "Qwen3.5-9B (English, ~5 GB — better quality)"
-        case .bielik_11b_v3_mlx_4bit:  "Bielik-11B v3.0 (Polish, ~6.5 GB)"
+        case .bielik_11b_v3_mlx_8bit:  "Bielik-11B v3.0 8-bit (Polish, ~12 GB — best quality)"
+        case .bielik_11b_v3_mlx_4bit:  "Bielik-11B v3.0 4-bit (Polish, ~6.5 GB)"
         case .bielik_4_5b_v3_mlx_8bit: "Bielik-4.5B v3.0 (Polish, ~4 GB)"
         }
     }
@@ -25,6 +27,7 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .qwen3_5_4b_mlx_8bit:     1.5
         case .qwen3_5_9b_mlx_4bit:     5.0
+        case .bielik_11b_v3_mlx_8bit:  12.0
         case .bielik_11b_v3_mlx_4bit:  6.5
         case .bielik_4_5b_v3_mlx_8bit: 4.0
         }
@@ -34,6 +37,7 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .qwen3_5_4b_mlx_8bit:     4.0
         case .qwen3_5_9b_mlx_4bit:     7.0
+        case .bielik_11b_v3_mlx_8bit:  14.0
         case .bielik_11b_v3_mlx_4bit:  8.0
         case .bielik_4_5b_v3_mlx_8bit: 5.0
         }
@@ -44,7 +48,8 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         case .qwen3_5_4b_mlx_8bit,
              .qwen3_5_9b_mlx_4bit:     [.english]
         // Bielik officially supports 40+ languages; allow EN too.
-        case .bielik_11b_v3_mlx_4bit,
+        case .bielik_11b_v3_mlx_8bit,
+             .bielik_11b_v3_mlx_4bit,
              .bielik_4_5b_v3_mlx_8bit: [.polish, .english]
         }
     }
@@ -53,7 +58,8 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .qwen3_5_4b_mlx_8bit:     "qwen3.5-4b-8bit"
         case .qwen3_5_9b_mlx_4bit:     "qwen3.5-9b"
-        case .bielik_11b_v3_mlx_4bit:  "bielik-11b-v3"
+        case .bielik_11b_v3_mlx_8bit:  "bielik-11b-v3-8bit"
+        case .bielik_11b_v3_mlx_4bit:  "bielik-11b-v3-4bit"
         case .bielik_4_5b_v3_mlx_8bit: "bielik-4.5b-v3"
         }
     }
@@ -66,7 +72,8 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .qwen3_5_4b_mlx_8bit,
              .qwen3_5_9b_mlx_4bit:     true
-        case .bielik_11b_v3_mlx_4bit,
+        case .bielik_11b_v3_mlx_8bit,
+             .bielik_11b_v3_mlx_4bit,
              .bielik_4_5b_v3_mlx_8bit: false
         }
     }

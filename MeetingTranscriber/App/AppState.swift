@@ -263,7 +263,10 @@ final class AppState {
                     prompt: actionsPrompt,
                     instructions: systemPrompt,
                     maxTokens: 600,
-                    temperature: 0.1,
+                    // 0.35 — high enough that small Polish models like
+                    // Bielik-4.5b don't lock into single-bullet repetition,
+                    // low enough to keep wording faithful to the transcript.
+                    temperature: 0.35,
                     disableThinking: disableThinking
                 )
                 for try await chunk in actionsStream {

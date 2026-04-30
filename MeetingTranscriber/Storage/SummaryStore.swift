@@ -19,7 +19,7 @@ enum SummaryStore {
     static func defaultModel(for language: TranscriptionLanguage) -> LanguageModel {
         switch language {
         case .english: return .qwen3_5_4b_mlx_8bit
-        case .polish:  return .bielik_11b_v3_mlx_4bit
+        case .polish:  return .bielik_11b_v3_mlx_8bit
         }
     }
 

@@ -142,10 +142,13 @@ enum SummaryPrompts {
     }
 
     /// Parse the bullet list the model returned into a clean array of strings.
-    /// Strips leading `-` / `•` / `*`, dedents, and drops the "None." sentinel.
+    /// Strips leading `-` / `•` / `*`, dedents, drops the "None." sentinel,
+    /// collapses repeats (small Polish models occasionally loop on a single
+    /// bullet), and caps the result at 12 items as a backstop.
     static func parseActionItems(_ raw: String) -> [String] {
         let lines = raw.split(whereSeparator: \.isNewline).map(String.init)
         var out: [String] = []
+        var seen = Set<String>()
         for line in lines {
             var s = line.trimmingCharacters(in: .whitespaces)
             guard !s.isEmpty else { continue }
@@ -155,7 +158,14 @@ enum SummaryPrompts {
             guard !s.isEmpty else { continue }
             let lower = s.lowercased()
             if lower == "none." || lower == "none" || lower == "brak." || lower == "brak" { continue }
+            // Stop before a degenerate loop overwhelms the list. We dedupe on
+            // a normalised key (lowercased, trimmed, punctuation collapsed)
+            // so that `"Ania."` and `"ania"` count as the same item.
+            let key = lower.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
+            if seen.contains(key) { continue }
+            seen.insert(key)
             out.append(s)
+            if out.count >= 12 { break }
         }
         return out
     }

@@ -14,11 +14,40 @@ struct RootView: View {
     @State private var showFileImporter: Bool = false
     @State private var pendingImportURL: URL? = nil
     @State private var pendingDelete: TranscriptDocument? = nil
+    /// When false (the default), recordings under `ghostDurationThreshold`
+    /// with no usable segments are hidden from the sidebar — see
+    /// `isGhostRecording`. Search overrides this so a query always finds
+    /// every match.
+    @State private var showShortRecordings: Bool = false
+
+    /// Recordings shorter than this AND with no extracted speech are
+    /// considered "ghosts" — typically aborted recordings that captured
+    /// silence or a stray click. 15 seconds is conservative enough that
+    /// a real one-sentence note would still survive.
+    private static let ghostDurationThreshold: TimeInterval = 15
+
+    private static func isGhostRecording(_ doc: TranscriptDocument) -> Bool {
+        guard doc.duration < ghostDurationThreshold else { return false }
+        let combinedText = doc.segments
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .joined()
+        return combinedText.count < 12
+    }
+
+    private var ghostCount: Int {
+        appState.transcripts.filter(Self.isGhostRecording).count
+    }
 
     private var filteredTranscripts: [TranscriptDocument] {
-        guard !query.isEmpty else { return appState.transcripts }
+        let base: [TranscriptDocument]
+        if query.isEmpty && !showShortRecordings {
+            base = appState.transcripts.filter { !Self.isGhostRecording($0) }
+        } else {
+            base = appState.transcripts
+        }
+        guard !query.isEmpty else { return base }
         let q = query.lowercased()
-        return appState.transcripts.filter { doc in
+        return base.filter { doc in
             doc.title.lowercased().contains(q) ||
             doc.segments.contains(where: { $0.text.lowercased().contains(q) })
         }
@@ -142,6 +171,25 @@ struct RootView: View {
                                     pendingDelete = doc
                                 }
                             }
+                    }
+
+                    let hiddenCount = ghostCount
+                    if query.isEmpty && hiddenCount > 0 {
+                        Button {
+                            showShortRecordings.toggle()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: showShortRecordings
+                                      ? "eye.slash"
+                                      : "eye")
+                                Text(showShortRecordings
+                                     ? "Hide \(hiddenCount) short recording\(hiddenCount == 1 ? "" : "s")"
+                                     : "Show \(hiddenCount) short recording\(hiddenCount == 1 ? "" : "s")")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
