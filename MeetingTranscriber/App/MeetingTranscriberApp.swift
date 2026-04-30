@@ -49,7 +49,15 @@ struct MeetingTranscriberApp: App {
 
 /// Keeps the app alive for the menu-bar extra after the main window is closed.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Foundation.Notification) {
+        MCPLocalServer.shared.start()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationWillTerminate(_ notification: Foundation.Notification) {
+        MCPLocalServer.shared.stop()
     }
 }

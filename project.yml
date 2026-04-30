@@ -37,6 +37,9 @@ packages:
   swift-huggingface:
     url: https://github.com/huggingface/swift-huggingface
     from: "0.8.1"
+  swift-sdk:
+    url: https://github.com/modelcontextprotocol/swift-sdk
+    from: "0.12.0"
 targets:
   MeetingTranscriber:
     type: application
@@ -62,6 +65,8 @@ targets:
         product: Tokenizers
       - package: swift-huggingface
         product: HuggingFace
+      - package: swift-sdk
+        product: MCP
     info:
       path: MeetingTranscriber/Resources/Info.plist
       properties:
