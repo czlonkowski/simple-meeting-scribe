@@ -36,6 +36,25 @@ final class AppState {
         DictionaryStore.saveReplacements(wordReplacements)
     }
 
+    // MARK: – Summary glossary (persisted via DictionaryStore)
+    var glossaryTerms: [GlossaryTerm] = DictionaryStore.loadGlossary()
+
+    func addGlossaryTerm(_ entry: GlossaryTerm) {
+        glossaryTerms.append(entry)
+        DictionaryStore.saveGlossary(glossaryTerms)
+    }
+
+    func updateGlossaryTerm(_ entry: GlossaryTerm) {
+        guard let idx = glossaryTerms.firstIndex(where: { $0.id == entry.id }) else { return }
+        glossaryTerms[idx] = entry
+        DictionaryStore.saveGlossary(glossaryTerms)
+    }
+
+    func removeGlossaryTerms(withIDs ids: Set<UUID>) {
+        glossaryTerms.removeAll { ids.contains($0.id) }
+        DictionaryStore.saveGlossary(glossaryTerms)
+    }
+
     // MARK: – Summarization settings (persisted via SummaryStore)
     var defaultModelEnglish: LanguageModel = SummaryStore.loadDefaultModel(for: .english)
     var defaultModelPolish:  LanguageModel = SummaryStore.loadDefaultModel(for: .polish)
@@ -43,12 +62,32 @@ final class AppState {
     var systemPromptPolish:  String        = SummaryStore.loadSystemPrompt(for: .polish)
     var downloadedModelIDs:  Set<String>   = SummaryStore.loadDownloadedIDs()
 
+    /// User's display name. When non-empty, the `summarize` identification
+    /// phase replaces the mic-stem placeholder `"You"` with this value on every
+    /// run. The LLM does not need to infer it.
+    var userDisplayName: String = SummaryStore.loadUserDisplayName()
+
+    func setUserDisplayName(_ value: String) {
+        userDisplayName = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        SummaryStore.saveUserDisplayName(userDisplayName)
+    }
+
     func setDefaultModel(_ model: LanguageModel, for language: TranscriptionLanguage) {
         switch language {
         case .english: defaultModelEnglish = model
         case .polish:  defaultModelPolish = model
         }
         SummaryStore.saveDefaultModel(model, for: language)
+    }
+
+    /// Per-meeting summary model override. Pass `nil` to clear and fall back to
+    /// the language default from Settings.
+    func setSummaryModelOverride(_ model: LanguageModel?, for transcriptID: String) {
+        guard let idx = transcripts.firstIndex(where: { $0.id == transcriptID }) else { return }
+        var updated = transcripts[idx]
+        updated.summaryModelOverride = model
+        transcripts[idx] = updated
+        try? TranscriptStore.shared.save(updated, audioSource: nil)
     }
 
     func setSystemPrompt(_ text: String, for language: TranscriptionLanguage) {
@@ -71,12 +110,12 @@ final class AppState {
     enum SummarizationStage: Equatable {
         case idle
         case loadingModel(fraction: Double)
+        // First pass — read transcript, propose names for placeholder speakers.
+        case identifyingSpeakers
         case generatingSummary(text: String)
         // Summary is finalized at this point — carried forward so the UI keeps
-        // it visible while action items stream in.
-        case generatingActions(summary: String, text: String)
-        // Title pass after actions; both earlier results kept for display.
-        case generatingTitle(summary: String, actions: String)
+        // it visible while the title pass runs.
+        case generatingTitle(summary: String)
         case done
         case error(String)
 
@@ -180,20 +219,33 @@ final class AppState {
     ///
     /// `customSummaryInstruction`, if non-empty, replaces the built-in
     /// "write 3–6 sentences…" user prompt for *just the summary pass*. The
-    /// action-items and title passes always use their defaults. This is the
-    /// per-invocation override surfaced via the popover next to the
-    /// Summarize/Regenerate button; the persistent system prompt in Settings
-    /// is still applied on top as the `instructions:` for the ChatSession.
-    func summarize(transcriptID: String, customSummaryInstruction: String? = nil) {
+    /// title pass always uses its default. This is the per-invocation override
+    /// surfaced via the popover next to the Summarize/Regenerate button; the
+    /// persistent system prompt in Settings is still applied on top as the
+    /// `instructions:` for the ChatSession.
+    func summarize(
+        transcriptID: String,
+        customSummaryInstruction: String? = nil,
+        model: LanguageModel? = nil,
+        useGlossary: Bool = true,
+        inferSpeakerNames: Bool = true
+    ) {
         guard let doc = transcripts.first(where: { $0.id == transcriptID }) else { return }
         guard summarizeTask == nil else { return }
         cancelIdleUnload()
 
         let language = doc.language
-        let model = language == .polish ? defaultModelPolish : defaultModelEnglish
-        let systemPrompt = language == .polish ? systemPromptPolish : systemPromptEnglish
-        let feed = TranscriptFormatter.renderPlainForLLM(doc)
-        let disableThinking = model.usesThinkingMode
+        let resolvedModel: LanguageModel = model
+            ?? doc.summaryModelOverride
+            ?? (language == .polish ? defaultModelPolish : defaultModelEnglish)
+        let basePrompt = language == .polish ? systemPromptPolish : systemPromptEnglish
+        let glossaryAppendix: String? = useGlossary
+            ? SummaryPrompts.glossaryBlock(for: language, terms: glossaryTerms)
+            : nil
+        let systemPrompt: String = glossaryAppendix.map { basePrompt + "\n\n" + $0 } ?? basePrompt
+        let initialFeed = TranscriptFormatter.renderPlainForLLM(doc)
+        let disableThinking = resolvedModel.usesThinkingMode
+        let configuredUserName = userDisplayName
         let currentTitle = doc.title
         // For imported files, sourceURL holds the original filename (see
         // `TranscriptionPipeline.importedFileName`). Expose it so the title
@@ -208,12 +260,80 @@ final class AppState {
                 Task { @MainActor in self?.summarizeTask = nil }
             }
             do {
-                try await summaryEngine.ensureLoaded(model) { fraction in
+                try await summaryEngine.ensureLoaded(resolvedModel) { fraction in
                     Task { @MainActor in
                         self?.summarizationStage = .loadingModel(fraction: fraction)
                     }
                 }
-                await MainActor.run { self?.markDownloaded(model) }
+                await MainActor.run { self?.markDownloaded(resolvedModel) }
+
+                // --- Identification phase (runs before the summary pass so
+                //     downstream prompts see real names instead of "Remote N") ---
+                await MainActor.run {
+                    self?.summarizationStage = .identifyingSpeakers
+                }
+                let defaultRemoteRegex = try! Regex<Substring>("^Remote(?: \\d+)?$")
+                var workingSpeakers = doc.speakers
+
+                // 1) Deterministic: rename "You" → configured user display name.
+                if !configuredUserName.isEmpty {
+                    for i in workingSpeakers.indices where workingSpeakers[i].name == "You" {
+                        workingSpeakers[i].name = configuredUserName
+                    }
+                }
+
+                // 2) LLM inference for remote defaults (only when requested
+                //    and there's actually something with a default name).
+                let remoteToInfer = inferSpeakerNames
+                    ? workingSpeakers.filter {
+                        (try? defaultRemoteRegex.wholeMatch(in: $0.name)) != nil
+                    }
+                    : []
+                if !remoteToInfer.isEmpty {
+                    let identifyPrompt = SummaryPrompts.identifyInstruction(
+                        for: language,
+                        labels: remoteToInfer.map(\.name)
+                    ) + "\n\nTranscript:\n" + initialFeed
+                    let identifyStream = try await summaryEngine.stream(
+                        prompt: identifyPrompt,
+                        instructions: systemPrompt,
+                        maxTokens: 200,
+                        temperature: 0.1,
+                        disableThinking: disableThinking
+                    )
+                    var identifyRaw = ""
+                    for try await chunk in identifyStream {
+                        if Task.isCancelled { throw SummarizationError.cancelled }
+                        identifyRaw += chunk
+                    }
+                    let cleaned = SummaryPrompts.stripThinking(identifyRaw)
+                    let inferred = SummaryPrompts.parseInferredNames(cleaned)
+                    for i in workingSpeakers.indices {
+                        let currentName = workingSpeakers[i].name
+                        guard (try? defaultRemoteRegex.wholeMatch(in: currentName)) != nil,
+                              let proposed = inferred[currentName],
+                              !proposed.isEmpty,
+                              proposed.lowercased() != "unknown"
+                        else { continue }
+                        workingSpeakers[i].name = proposed
+                    }
+                }
+
+                // 3) Persist relabeled speakers immediately so the UI updates
+                //    even if a later pass fails, then re-render the LLM feed.
+                let feed: String = await MainActor.run {
+                    guard let self,
+                          let idx = self.transcripts.firstIndex(where: { $0.id == transcriptID })
+                    else { return initialFeed }
+                    if self.transcripts[idx].speakers != workingSpeakers {
+                        var updated = self.transcripts[idx]
+                        updated.speakers = workingSpeakers
+                        self.transcripts[idx] = updated
+                        try? TranscriptStore.shared.save(updated, audioSource: nil)
+                        return TranscriptFormatter.renderPlainForLLM(updated)
+                    }
+                    return initialFeed
+                }
 
                 // --- Summary pass ---
                 await MainActor.run {
@@ -250,41 +370,10 @@ final class AppState {
                     .stripThinking(summaryText)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // --- Action items pass ---
-                await MainActor.run {
-                    self?.summarizationStage = .generatingActions(
-                        summary: finalizedSummary, text: "")
-                }
-                var actionsText = ""
-                let actionsPrompt =
-                    SummaryPrompts.actionItemsInstruction(for: language)
-                    + "\n\nTranscript:\n" + feed
-                let actionsStream = try await summaryEngine.stream(
-                    prompt: actionsPrompt,
-                    instructions: systemPrompt,
-                    maxTokens: 600,
-                    // 0.35 — high enough that small Polish models like
-                    // Bielik-4.5b don't lock into single-bullet repetition,
-                    // low enough to keep wording faithful to the transcript.
-                    temperature: 0.35,
-                    disableThinking: disableThinking
-                )
-                for try await chunk in actionsStream {
-                    if Task.isCancelled { throw SummarizationError.cancelled }
-                    actionsText += chunk
-                    let visible = SummaryPrompts.stripThinking(actionsText)
-                    await MainActor.run {
-                        self?.summarizationStage = .generatingActions(
-                            summary: finalizedSummary, text: visible)
-                    }
-                }
-
-                let finalizedActions = SummaryPrompts.stripThinking(actionsText)
-
                 // --- Title pass (short, one-line) ---
                 await MainActor.run {
                     self?.summarizationStage = .generatingTitle(
-                        summary: finalizedSummary, actions: finalizedActions)
+                        summary: finalizedSummary)
                 }
                 var titleText = ""
                 let titlePrompt =
@@ -302,9 +391,8 @@ final class AppState {
                     titleText += chunk
                 }
 
-                let parsedActions = SummaryPrompts.parseActionItems(finalizedActions)
-                let finalTitle    = SummaryPrompts.sanitizeTitle(titleText)
-                let modelShort    = model.shortName
+                let finalTitle = SummaryPrompts.sanitizeTitle(titleText)
+                let modelShort = resolvedModel.shortName
 
                 await MainActor.run {
                     guard let self else { return }
@@ -312,7 +400,6 @@ final class AppState {
                     else { return }
                     var updated = self.transcripts[idx]
                     updated.summary = finalizedSummary
-                    updated.actionItems = parsedActions
                     updated.summaryModelShortName = modelShort
                     updated.summaryGeneratedAt = Date()
                     // Replace the placeholder "Recording — <date>" / "Google Meet — <slug>"
@@ -649,10 +736,10 @@ final class AppState {
     // MARK: – Re-transcribe an existing document
 
     /// Enqueue a re-transcription of an existing document's stems with the
-    /// given model. Preserves the title, clears the stale summary + action
-    /// items, and runs diarization fresh (speaker renames will be lost).
-    /// No-op if the document has no voice stem on disk, or if a
-    /// re-transcription is already in flight for this document.
+    /// given model. Preserves the title, clears the stale summary, and runs
+    /// diarization fresh (speaker renames will be lost). No-op if the document
+    /// has no voice stem on disk, or if a re-transcription is already in
+    /// flight for this document.
     func retranscribe(documentID: String, with model: WhisperModel) {
         guard let doc = transcripts.first(where: { $0.id == documentID }) else { return }
         guard let voiceURL = TranscriptStore.shared.audioURL(for: doc) else {
@@ -811,7 +898,6 @@ final class AppState {
             segments: fresh.segments,
             audioFileName: existing.audioFileName,
             summary: nil,
-            actionItems: nil,
             summaryModelShortName: nil,
             summaryGeneratedAt: nil
         )

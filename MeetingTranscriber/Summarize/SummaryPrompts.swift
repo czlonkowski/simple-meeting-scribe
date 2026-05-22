@@ -1,8 +1,8 @@
 import Foundation
 
-/// Per-language prompt templates. Two calls per summarization (summary then
-/// action items) keep streaming UX simple and robust — no JSON parsing,
-/// each block lands in its own UI card as it generates.
+/// Per-language prompt templates. Two passes per summarization (summary then
+/// title) keep streaming UX simple and robust — no JSON parsing, each block
+/// lands in its own UI card as it generates.
 enum SummaryPrompts {
 
     // MARK: - System instructions (user-editable via Settings).
@@ -14,6 +14,68 @@ enum SummaryPrompts {
     static let defaultSystemPolish =
         "Jesteś asystentem do notowania spotkań. Bądź zwięzły, rzeczowy i wierny transkrypcji. " +
         "Odpowiadaj w języku transkrypcji. Zachowaj nazwy, terminy techniczne i liczby dokładnie tak, jak się pojawiają."
+
+    /// Prompt asking the LLM to map placeholder speaker labels ("Remote",
+    /// "Remote 1", …) to real names mentioned in the conversation. Strict
+    /// output format so `parseInferredNames` can read it back deterministically.
+    static func identifyInstruction(for language: TranscriptionLanguage,
+                                    labels: [String]) -> String {
+        let intro: String
+        let unknown: String
+        switch language {
+        case .english:
+            intro = "Below is a meeting transcript with placeholder speaker labels. For each label, infer the speaker's real name only if the conversation clearly indicates it (e.g. they are addressed by name). Reply with one line per label in the exact format:"
+            unknown = "If no name is clearly indicated for a label, write 'unknown'. Do not invent names. Do not add any other commentary."
+        case .polish:
+            intro = "Poniżej znajduje się transkrypcja spotkania z zastępczymi etykietami mówców. Dla każdej etykiety podaj prawdziwe imię, tylko jeśli rozmowa jasno to wskazuje (np. ktoś zwraca się po imieniu). Odpowiedz dokładnie jedną linią na etykietę w formacie:"
+            unknown = "Jeśli żadne imię nie jest jasno wskazane dla danej etykiety, napisz 'unknown'. Nie wymyślaj imion. Nie dodawaj żadnego komentarza."
+        }
+        let format = "<label>: <name or unknown>"
+        let bullets = labels.map { "- \($0)" }.joined(separator: "\n")
+        return "\(intro)\n\(format)\n\(unknown)\n\nLabels to identify:\n\(bullets)"
+    }
+
+    /// Parses lines like "Remote 1: Romek" / "Remote 2: unknown" produced by
+    /// the identification pass. Tolerates leading bullets, surrounding
+    /// whitespace, and extra commentary lines (skipped).
+    static func parseInferredNames(_ raw: String) -> [String: String] {
+        var out: [String: String] = [:]
+        for line in raw.split(whereSeparator: \.isNewline) {
+            let trimmed = String(line)
+                .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "-*•"))
+                .trimmingCharacters(in: .whitespaces)
+            guard let colonIdx = trimmed.firstIndex(of: ":") else { continue }
+            let label = String(trimmed[..<colonIdx])
+                .trimmingCharacters(in: .whitespaces)
+            let name = String(trimmed[trimmed.index(after: colonIdx)...])
+                .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            guard !label.isEmpty, !name.isEmpty else { continue }
+            out[label] = name
+        }
+        return out
+    }
+
+    /// Formats enabled glossary entries into a system-prompt appendix. Returns
+    /// nil when nothing is enabled / both fields blank, so the caller can skip
+    /// the appendix entirely. Header language matches the transcript.
+    static func glossaryBlock(for language: TranscriptionLanguage,
+                              terms: [GlossaryTerm]) -> String? {
+        let enabled = terms.filter {
+            $0.isEnabled
+                && !$0.term.trimmingCharacters(in: .whitespaces).isEmpty
+                && !$0.definition.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        guard !enabled.isEmpty else { return nil }
+        let header: String = (language == .polish)
+            ? "Słownik pojęć (użyj tych definicji do interpretacji transkrypcji):"
+            : "Glossary of domain terms (use these definitions to interpret the transcript):"
+        let lines = enabled
+            .map { "- \($0.term): \($0.definition)" }
+            .joined(separator: "\n")
+        return header + "\n" + lines
+    }
 
     // MARK: - Per-call user prompts.
 
@@ -71,57 +133,6 @@ enum SummaryPrompts {
         return t
     }
 
-    static func actionItemsInstruction(for language: TranscriptionLanguage) -> String {
-        switch language {
-        case .english:
-            return """
-                Extract ONLY future commitments and next steps from the transcript below.
-
-                An action item is something someone explicitly COMMITS TO DO. It requires:
-                • a future-tense verb (will, going to, need to, should, let's, I'll …), OR
-                • an assignment (“X will handle Y”), OR
-                • a deadline or next meeting.
-
-                It is NOT:
-                • a description of the current situation
-                • an opinion, observation, fact, or conclusion
-                • a question
-                • something that already happened
-                • a paraphrase of what someone said
-
-                Output format (bullets only, no preamble, no headings):
-                - [owner] task (due: …)     ← when an owner or deadline is stated
-                - task                       ← otherwise
-                - None.                      ← if the transcript contains NO real commitments
-
-                When in doubt, omit. A meeting with 0 action items is common and expected.
-                """
-        case .polish:
-            return """
-                Wyodrębnij WYŁĄCZNIE zobowiązania i kolejne kroki z poniższej transkrypcji.
-
-                Zadaniem do wykonania jest coś, do czego ktoś się wyraźnie ZOBOWIĄZUJE. Wymaga:
-                • czasu przyszłego lub trybu rozkazującego (zrobię, wyślę, trzeba, musimy, ustalmy…), LUB
-                • przydzielenia osoby („X zajmie się Y”), LUB
-                • terminu albo kolejnego spotkania.
-
-                NIE jest zadaniem:
-                • opis bieżącej sytuacji
-                • opinia, obserwacja, fakt lub wniosek
-                • pytanie
-                • coś, co już się wydarzyło
-                • parafraza czyjejś wypowiedzi
-
-                Format (tylko punkty, bez wstępu, bez nagłówków):
-                - [osoba] zadanie (termin: …)   ← gdy podana jest osoba lub termin
-                - zadanie                        ← w przeciwnym razie
-                - Brak.                          ← gdy transkrypcja NIE zawiera żadnych rzeczywistych zobowiązań
-
-                Jeżeli masz wątpliwości, pomiń. Spotkanie bez zadań do wykonania jest normalne.
-                """
-        }
-    }
-
     /// Strip any `<think>…</think>` blocks the model might still emit.
     /// Safe to call on streaming partials: if the opening tag was seen but the
     /// closing one hasn't arrived yet, everything from `<think>` onward is
@@ -137,35 +148,6 @@ enum SummaryPrompts {
         // hide everything from that point so the UI doesn't show reasoning.
         if let open = out.range(of: "<think>") {
             out.removeSubrange(open.lowerBound..<out.endIndex)
-        }
-        return out
-    }
-
-    /// Parse the bullet list the model returned into a clean array of strings.
-    /// Strips leading `-` / `•` / `*`, dedents, drops the "None." sentinel,
-    /// collapses repeats (small Polish models occasionally loop on a single
-    /// bullet), and caps the result at 12 items as a backstop.
-    static func parseActionItems(_ raw: String) -> [String] {
-        let lines = raw.split(whereSeparator: \.isNewline).map(String.init)
-        var out: [String] = []
-        var seen = Set<String>()
-        for line in lines {
-            var s = line.trimmingCharacters(in: .whitespaces)
-            guard !s.isEmpty else { continue }
-            if let first = s.first, "-•*·".contains(first) {
-                s = String(s.dropFirst()).trimmingCharacters(in: .whitespaces)
-            }
-            guard !s.isEmpty else { continue }
-            let lower = s.lowercased()
-            if lower == "none." || lower == "none" || lower == "brak." || lower == "brak" { continue }
-            // Stop before a degenerate loop overwhelms the list. We dedupe on
-            // a normalised key (lowercased, trimmed, punctuation collapsed)
-            // so that `"Ania."` and `"ania"` count as the same item.
-            let key = lower.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
-            if seen.contains(key) { continue }
-            seen.insert(key)
-            out.append(s)
-            if out.count >= 12 { break }
         }
         return out
     }

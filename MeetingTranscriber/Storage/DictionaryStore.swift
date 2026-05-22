@@ -7,6 +7,7 @@ import Foundation
 enum DictionaryStore {
     private static let primesKey       = "Dictionary.LanguagePrompts"
     private static let replacementsKey = "Dictionary.WordReplacements"
+    private static let glossaryKey     = "Dictionary.Glossary"
 
     /// Light greeting sentences style-prime Whisper for punctuation/casing
     /// and (for Polish) diacritics. Pattern taken from VoiceInk.
@@ -43,6 +44,20 @@ enum DictionaryStore {
     static func saveReplacements(_ list: [WordReplacement]) {
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: replacementsKey)
+        }
+    }
+
+    static func loadGlossary() -> [GlossaryTerm] {
+        guard
+            let data = UserDefaults.standard.data(forKey: glossaryKey),
+            let decoded = try? JSONDecoder().decode([GlossaryTerm].self, from: data)
+        else { return [] }
+        return decoded
+    }
+
+    static func saveGlossary(_ list: [GlossaryTerm]) {
+        if let data = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(data, forKey: glossaryKey)
         }
     }
 }

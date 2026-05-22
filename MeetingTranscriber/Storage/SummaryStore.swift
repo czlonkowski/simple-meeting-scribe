@@ -13,6 +13,7 @@ enum SummaryStore {
     private static let defaultModelPrefix    = "Summary.DefaultModel."     // + language raw value
     private static let systemPromptPrefix    = "Summary.SystemPrompt."     // + language raw value
     private static let downloadedIDsKey      = "Summary.DownloadedModelIDs"
+    private static let userDisplayNameKey    = "Summary.UserDisplayName"
 
     // MARK: - Defaults
 
@@ -66,6 +67,15 @@ enum SummaryStore {
 
     static func saveDownloadedIDs(_ ids: Set<String>) {
         UserDefaults.standard.set(Array(ids), forKey: downloadedIDsKey)
+    }
+
+    static func loadUserDisplayName() -> String {
+        UserDefaults.standard.string(forKey: userDisplayNameKey) ?? ""
+    }
+
+    static func saveUserDisplayName(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(trimmed, forKey: userDisplayNameKey)
     }
 
     // MARK: - Cache inspection / deletion

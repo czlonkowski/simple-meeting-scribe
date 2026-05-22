@@ -47,9 +47,9 @@ enum MCPTools {
         Tool(
             name: "get_summary",
             description: """
-                Return the LLM-generated summary, action items, generation \
-                model and timestamp for the given transcript id. Returns an \
-                error result if the transcript hasn't been summarized yet.
+                Return the LLM-generated summary, generation model and \
+                timestamp for the given transcript id. Returns an error \
+                result if the transcript hasn't been summarized yet.
                 """,
             inputSchema: .object([
                 "type": .string("object"),
@@ -142,12 +142,6 @@ enum MCPTools {
         }
 
         var rendered = "# Summary\n\n\(summary)\n"
-        if let items = doc.actionItems, !items.isEmpty {
-            rendered += "\n## Action items\n\n"
-            for item in items {
-                rendered += "- \(item)\n"
-            }
-        }
         if let model = doc.summaryModelShortName {
             rendered += "\n_Model: \(model)"
             if let generatedAt = doc.summaryGeneratedAt {

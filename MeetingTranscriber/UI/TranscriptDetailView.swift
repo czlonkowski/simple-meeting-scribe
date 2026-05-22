@@ -15,6 +15,12 @@ struct TranscriptDetailView: View {
     @State private var showingCustomPromptPopover: Bool = false
     @State private var customSummaryPrompt: String = ""
     @State private var transcriptExpanded: Bool = false
+    /// Per-summary glossary toggle. Defaults to true whenever any glossary
+    /// entry is enabled; resets on each detail-view appearance.
+    @State private var useGlossaryThisRun: Bool = true
+    /// Per-summary "identify speakers" toggle. Defaults to true when at least
+    /// one default-named ("Remote", "Remote N") speaker still exists.
+    @State private var inferSpeakerNamesThisRun: Bool = true
 
     private var document: TranscriptDocument? {
         appState.transcripts.first(where: { $0.id == documentID })
@@ -26,6 +32,8 @@ struct TranscriptDetailView: View {
                 .onAppear {
                     titleDraft = doc.title
                     loadAudioIfAvailable(for: doc)
+                    useGlossaryThisRun = appState.glossaryTerms.contains(where: \.isEnabled)
+                    inferSpeakerNamesThisRun = doc.speakers.contains { Self.hasDefaultRemoteName($0.name) }
                 }
                 .onDisappear { audioPlayer.unload() }
         } else {
@@ -190,7 +198,7 @@ struct TranscriptDetailView: View {
 
     @ViewBuilder
     private func summarizeButton(for doc: TranscriptDocument) -> some View {
-        let hasSummary = (doc.summary?.isEmpty == false) || (doc.actionItems?.isEmpty == false)
+        let hasSummary = (doc.summary?.isEmpty == false)
         if isSummarizingThis {
             Button(role: .destructive) {
                 appState.cancelSummarization()
@@ -200,30 +208,165 @@ struct TranscriptDetailView: View {
             .buttonStyle(.glass)
             .controlSize(.large)
         } else {
-            HStack(spacing: 8) {
-                Button {
-                    appState.summarize(transcriptID: documentID)
-                } label: {
-                    Label(hasSummary ? "Regenerate" : "Summarize",
-                          systemImage: "sparkles")
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .help("Generate a local LLM summary for this transcript")
+            VStack(alignment: .trailing, spacing: 6) {
+                HStack(spacing: 8) {
+                    Button {
+                        appState.summarize(transcriptID: documentID,
+                                           useGlossary: useGlossaryThisRun,
+                                           inferSpeakerNames: inferSpeakerNamesThisRun)
+                    } label: {
+                        Label(hasSummary ? "Regenerate" : "Summarize",
+                              systemImage: "sparkles")
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .help("Generate a local LLM summary for this transcript")
 
-                Button {
-                    showingCustomPromptPopover = true
-                } label: {
-                    Image(systemName: "text.bubble")
+                    Button {
+                        showingCustomPromptPopover = true
+                    } label: {
+                        Image(systemName: "text.bubble")
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .help("Summarize with a one-off custom prompt")
+                    .popover(isPresented: $showingCustomPromptPopover, arrowEdge: .top) {
+                        customPromptPopover()
+                    }
                 }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .help("Summarize with a one-off custom prompt")
-                .popover(isPresented: $showingCustomPromptPopover, arrowEdge: .top) {
-                    customPromptPopover()
-                }
+                summaryOptionsRow(for: doc)
             }
         }
+    }
+
+    /// Three peer chips beneath the Summarize button — model, glossary,
+    /// identify-speakers. Same caption styling for visual unity; on/off toggles
+    /// signal state via filled vs outline SF Symbols.
+    @ViewBuilder
+    private func summaryOptionsRow(for doc: TranscriptDocument) -> some View {
+        HStack(spacing: 14) {
+            summaryModelMenu(for: doc)
+            glossaryChip()
+            identifyChip(for: doc)
+        }
+    }
+
+    /// Per-meeting LLM picker. Defaults to the Settings model for the
+    /// transcript's language; selecting a non-default model persists the choice
+    /// on the document. Both the summary pass and the title pass use it.
+    @ViewBuilder
+    private func summaryModelMenu(for doc: TranscriptDocument) -> some View {
+        let language = doc.language
+        let langDefault: LanguageModel = (language == .polish)
+            ? appState.defaultModelPolish
+            : appState.defaultModelEnglish
+        let effective = doc.summaryModelOverride ?? langDefault
+        // Per-meeting override is explicit user intent — list every model.
+        // The Settings defaults are still filtered by supportedLanguages.
+        let allModels = LanguageModel.allCases
+
+        Menu {
+            ForEach(allModels) { m in
+                Button {
+                    appState.setSummaryModelOverride(
+                        m == langDefault ? nil : m,
+                        for: documentID
+                    )
+                } label: {
+                    HStack {
+                        if m == effective {
+                            Image(systemName: "checkmark")
+                        }
+                        Text(m.displayName)
+                        if !appState.downloadedModelIDs.contains(m.repoID) {
+                            Text("· downloads on first use")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            if doc.summaryModelOverride != nil {
+                Divider()
+                Button("Reset to Settings default") {
+                    appState.setSummaryModelOverride(nil, for: documentID)
+                }
+            }
+        } label: {
+            Label(effective.shortName, systemImage: "cpu")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Choose the LLM used for the summary and title. Defaults to the Settings model for this language.")
+    }
+
+    /// Per-summary opt-in for the glossary appendix. Hidden when no glossary
+    /// entries are enabled — nothing to toggle.
+    @ViewBuilder
+    private func glossaryChip() -> some View {
+        if appState.glossaryTerms.contains(where: \.isEnabled) {
+            optionChip(
+                title: "Glossary",
+                isOn: useGlossaryThisRun,
+                onSymbol: "book.closed.fill",
+                offSymbol: "book.closed",
+                help: useGlossaryThisRun
+                    ? "Disable the glossary for this run."
+                    : "Inject the Settings glossary so the LLM understands domain terms."
+            ) {
+                useGlossaryThisRun.toggle()
+            }
+        }
+    }
+
+    /// Per-summary opt-in for the speaker-identification LLM pass. Hidden when
+    /// every speaker already has a non-default name (user-edited, or already
+    /// inferred from a previous summarization).
+    @ViewBuilder
+    private func identifyChip(for doc: TranscriptDocument) -> some View {
+        if doc.speakers.contains(where: { Self.hasDefaultRemoteName($0.name) }) {
+            optionChip(
+                title: "Identify",
+                isOn: inferSpeakerNamesThisRun,
+                onSymbol: "person.text.rectangle.fill",
+                offSymbol: "person.text.rectangle",
+                help: inferSpeakerNamesThisRun
+                    ? "Skip the speaker-identification pass for this run."
+                    : "Run a quick LLM pass to infer names of placeholder \"Remote\" speakers."
+            ) {
+                inferSpeakerNamesThisRun.toggle()
+            }
+        }
+    }
+
+    /// Common visual treatment for the two boolean chips. Mirrors the model
+    /// chip (caption font, secondary tint, leading SF Symbol). Active state
+    /// uses the filled symbol variant and a slightly stronger tint.
+    private func optionChip(
+        title: String,
+        isOn: Bool,
+        onSymbol: String,
+        offSymbol: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: isOn ? onSymbol : offSymbol)
+                .font(.caption)
+                .foregroundStyle(isOn ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help(help)
+    }
+
+    /// True for the generator-assigned defaults `"Remote"` and `"Remote N"`.
+    /// User-edited names never match.
+    private static func hasDefaultRemoteName(_ name: String) -> Bool {
+        if name == "Remote" { return true }
+        guard name.hasPrefix("Remote "), name.count > 7 else { return false }
+        return name.dropFirst(7).allSatisfy(\.isNumber)
     }
 
     // MARK: – Re-transcribe
@@ -278,7 +421,7 @@ struct TranscriptDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Custom summary prompt")
                 .font(.headline)
-            Text("Replaces only the summary instruction for this run. Action items, title, and the Settings system prompt still apply as usual.")
+            Text("Replaces only the summary instruction for this run. Title and the Settings system prompt still apply as usual.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -305,7 +448,9 @@ struct TranscriptDetailView: View {
                     showingCustomPromptPopover = false
                     appState.summarize(
                         transcriptID: documentID,
-                        customSummaryInstruction: customSummaryPrompt
+                        customSummaryInstruction: customSummaryPrompt,
+                        useGlossary: useGlossaryThisRun,
+                        inferSpeakerNames: inferSpeakerNamesThisRun
                     )
                 }
                 .keyboardShortcut(.defaultAction)
@@ -321,7 +466,7 @@ struct TranscriptDetailView: View {
     private func summaryBlock(for doc: TranscriptDocument) -> some View {
         if isSummarizingThis {
             liveStreamingBlock()
-        } else if doc.summary != nil || (doc.actionItems?.isEmpty == false) {
+        } else if doc.summary?.isEmpty == false {
             savedSummaryBlock(for: doc)
         } else if case .error(let msg) = appState.summarizationStage,
                   appState.summarizingTranscriptID == documentID {
@@ -340,30 +485,23 @@ struct TranscriptDetailView: View {
                     ProgressView(value: fraction)
                         .progressViewStyle(.linear)
 
+                case .identifyingSpeakers:
+                    Label("Identifying speakers…", systemImage: "person.text.rectangle")
+                        .font(.headline)
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Reading transcript…").foregroundStyle(.secondary)
+                    }
+
                 case .generatingSummary(let text):
                     Label("Summary", systemImage: "sparkles")
                         .font(.headline)
                     streamingText(text, placeholder: "Generating…")
 
-                case .generatingActions(let summary, let text):
+                case .generatingTitle(let summary):
                     Label("Summary", systemImage: "sparkles")
                         .font(.headline)
                     Text(markdown: summary).textSelection(.enabled)
-                    Divider()
-                    Label("Action items", systemImage: "checklist")
-                        .font(.headline)
-                    streamingText(text, placeholder: "Extracting…")
-
-                case .generatingTitle(let summary, let actions):
-                    Label("Summary", systemImage: "sparkles")
-                        .font(.headline)
-                    Text(markdown: summary).textSelection(.enabled)
-                    if !actions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Divider()
-                        Label("Action items", systemImage: "checklist")
-                            .font(.headline)
-                        Text(markdown: actions).textSelection(.enabled)
-                    }
                     Divider()
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
@@ -408,26 +546,11 @@ struct TranscriptDetailView: View {
                     .buttonStyle(.glass)
                     .controlSize(.small)
                     .sensoryFeedback(.success, trigger: summaryJustCopied) { _, new in new }
-                    .help("Copy summary + action items as Markdown")
+                    .help("Copy summary as Markdown")
                 }
 
                 if let summary = doc.summary, !summary.isEmpty {
                     Text(markdown: summary).textSelection(.enabled)
-                }
-                if let actions = doc.actionItems, !actions.isEmpty {
-                    Divider()
-                    Label("Action items", systemImage: "checklist")
-                        .font(.headline)
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(actions.enumerated()), id: \.offset) { _, item in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Image(systemName: "circle")
-                                    .foregroundStyle(.tertiary)
-                                    .imageScale(.small)
-                                Text(markdown: item).textSelection(.enabled)
-                            }
-                        }
-                    }
                 }
                 if let model = doc.summaryModelShortName,
                    let when = doc.summaryGeneratedAt {

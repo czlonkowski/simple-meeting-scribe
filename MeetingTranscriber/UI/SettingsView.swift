@@ -201,11 +201,28 @@ private struct SummarySettingsView: View {
     @State private var polishPromptDraft: String = ""
     @State private var englishPromptSaved: Bool = false
     @State private var polishPromptSaved: Bool = false
+    @State private var selectedGlossaryIDs: Set<UUID> = []
+    @State private var newGlossaryTerm: String = ""
+    @State private var newGlossaryDefinition: String = ""
 
     var body: some View {
         @Bindable var state = appState
 
         Form {
+            Section {
+                TextField("Your name", text: Binding(
+                    get: { appState.userDisplayName },
+                    set: { appState.setUserDisplayName($0) }
+                ))
+                .textFieldStyle(.roundedBorder)
+            } header: {
+                Text("Your name")
+            } footer: {
+                Text("Used to deterministically replace the placeholder \"You\" speaker in transcripts when you summarize. Leave empty to keep \"You\" as-is.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Picker("English", selection: Binding(
                     get: { appState.defaultModelEnglish },
@@ -290,6 +307,59 @@ private struct SummarySettingsView: View {
                 Text("System prompts")
             }
 
+            Section {
+                Table(appState.glossaryTerms, selection: $selectedGlossaryIDs) {
+                    TableColumn("") { entry in
+                        Toggle("", isOn: Binding(
+                            get: { entry.isEnabled },
+                            set: { isOn in
+                                var copy = entry
+                                copy.isEnabled = isOn
+                                appState.updateGlossaryTerm(copy)
+                            }
+                        ))
+                        .labelsHidden()
+                    }
+                    .width(28)
+
+                    TableColumn("Term") { entry in
+                        Text(entry.term).foregroundStyle(.primary)
+                    }
+                    TableColumn("Definition") { entry in
+                        Text(entry.definition).foregroundStyle(.primary)
+                    }
+                }
+                .frame(minHeight: 140)
+
+                HStack(spacing: 8) {
+                    TextField("Term", text: $newGlossaryTerm)
+                        .textFieldStyle(.roundedBorder)
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(.tertiary)
+                    TextField("Short definition", text: $newGlossaryDefinition)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Add") {
+                        addGlossaryEntry()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newGlossaryTerm.trimmingCharacters(in: .whitespaces).isEmpty ||
+                              newGlossaryDefinition.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(role: .destructive) {
+                        appState.removeGlossaryTerms(withIDs: selectedGlossaryIDs)
+                        selectedGlossaryIDs.removeAll()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(selectedGlossaryIDs.isEmpty)
+                }
+            } header: {
+                Text("Glossary")
+            } footer: {
+                Text("Domain terms with short definitions. When the per-summary toggle is on, enabled entries are injected into the LLM's system prompt so it interprets proper nouns and jargon correctly.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Runtime") {
                 Button("Unload current model") {
                     Task { await appState.unloadSummaryModel() }
@@ -302,6 +372,15 @@ private struct SummarySettingsView: View {
             englishPromptDraft = appState.systemPromptEnglish
             polishPromptDraft  = appState.systemPromptPolish
         }
+    }
+
+    private func addGlossaryEntry() {
+        let term = newGlossaryTerm.trimmingCharacters(in: .whitespaces)
+        let definition = newGlossaryDefinition.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty, !definition.isEmpty else { return }
+        appState.addGlossaryTerm(GlossaryTerm(term: term, definition: definition))
+        newGlossaryTerm = ""
+        newGlossaryDefinition = ""
     }
 
     private func flash(_ keyPath: ReferenceWritableKeyPath<SummarySettingsView, Bool>) {

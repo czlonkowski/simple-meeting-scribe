@@ -74,6 +74,16 @@ struct WordReplacement: Codable, Identifiable, Hashable {
     var isEnabled: Bool = true
 }
 
+/// Domain-term glossary entry, injected into the summarization system prompt
+/// so the LLM can interpret proper nouns / jargon it can't infer from context.
+/// Independent of `WordReplacement` (which rewrites Whisper output post-decoding).
+struct GlossaryTerm: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var term: String              // e.g. "Estyl", "n8n"
+    var definition: String        // short explanation, one line preferred
+    var isEnabled: Bool = true
+}
+
 struct TranscriptDocument: Codable, Identifiable, Hashable {
     let id: String                // filename stem
     var title: String
@@ -89,9 +99,11 @@ struct TranscriptDocument: Codable, Identifiable, Hashable {
 
     // Summarization (optional — only set once the user runs one).
     var summary: String?
-    var actionItems: [String]?
     var summaryModelShortName: String?
     var summaryGeneratedAt: Date?
+    // Per-meeting override for the summarization model. nil = use the
+    // language default from Settings.
+    var summaryModelOverride: LanguageModel?
 
     enum SourceKind: String, Codable {
         case live
