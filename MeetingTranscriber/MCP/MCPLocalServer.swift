@@ -27,8 +27,6 @@ final class MCPLocalServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.czlonkowski.MeetingTranscriber.mcp", qos: .utility)
 
     private var listener: NWListener?
-    private var server: Server?
-    private var transport: StatelessHTTPServerTransport?
     private var bringUpTask: Task<Void, Never>?
 
     private init() {}
@@ -46,36 +44,10 @@ final class MCPLocalServer: @unchecked Sendable {
         bringUpTask = nil
         listener?.cancel()
         listener = nil
-        let server = self.server
-        let transport = self.transport
-        self.server = nil
-        self.transport = nil
-        Task {
-            await server?.stop()
-            await transport?.disconnect()
-        }
     }
 
     private func bringUp() async {
         Self.log("bringUp() entered")
-        let server = Server(
-            name: "meeting-transcriber",
-            version: "0.1.0",
-            instructions: "Search and read locally stored meeting transcripts.",
-            capabilities: .init(tools: .init(listChanged: false))
-        )
-        await registerHandlers(on: server)
-
-        let transport = StatelessHTTPServerTransport()
-        do {
-            try await server.start(transport: transport)
-        } catch {
-            Self.log("server.start failed — \(error)")
-            return
-        }
-        self.server = server
-        self.transport = transport
-
         guard let nwPort = NWEndpoint.Port(rawValue: Self.port) else { return }
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
@@ -140,12 +112,11 @@ final class MCPLocalServer: @unchecked Sendable {
         }
     }
 
-    /// Read one HTTP/1.1 request, dispatch it through the MCP transport,
-    /// write the response, and close. We don't keep-alive — single
-    /// request per TCP connection keeps the parser trivial. Claude Code
+    /// Read one HTTP/1.1 request, dispatch it through a throwaway MCP
+    /// server+transport, write the response, and close. We don't keep-alive —
+    /// single request per TCP connection keeps the parser trivial. Claude Code
     /// reconnects per request, which is fine on localhost.
     private func serve(_ connection: NWConnection) async {
-        guard let transport = self.transport else { return }
         do {
             let parsed = try await readRequest(from: connection)
             let request = HTTPRequest(
@@ -156,7 +127,7 @@ final class MCPLocalServer: @unchecked Sendable {
             )
             let response: HTTPResponse
             if parsed.path == Self.endpointPath {
-                response = await transport.handleRequest(request)
+                response = await handleMCP(request)
             } else {
                 response = .error(statusCode: 404, .invalidRequest("Not Found"))
             }
@@ -165,6 +136,38 @@ final class MCPLocalServer: @unchecked Sendable {
             // Client disconnected, malformed request, etc — just close.
             NSLog("MCP: connection closed — %@", String(describing: error))
         }
+    }
+
+    /// Handle one MCP request with a fresh, single-use server + transport.
+    ///
+    /// The SDK's `Server` enforces single initialization for its lifetime: a
+    /// second `initialize` on a live server is rejected with `-32600 "Server
+    /// is already initialized"`. A long-lived shared server therefore broke
+    /// every reconnect once the first client had connected. Giving each HTTP
+    /// request its own uninitialized server sidesteps that entirely —
+    /// `initialize` always succeeds, and because the server runs non-strict,
+    /// `tools/list` / `tools/call` need no prior init within the request.
+    private func handleMCP(_ request: HTTPRequest) async -> HTTPResponse {
+        let server = Server(
+            name: "meeting-transcriber",
+            version: "0.1.0",
+            instructions: "Search and read locally stored meeting transcripts.",
+            capabilities: .init(tools: .init(listChanged: false))
+        )
+        await registerHandlers(on: server)
+
+        let transport = StatelessHTTPServerTransport()
+        do {
+            try await server.start(transport: transport)
+        } catch {
+            Self.log("server.start failed — \(error)")
+            return .error(statusCode: 500, .internalError("MCP server failed to start"))
+        }
+
+        let response = await transport.handleRequest(request)
+        await server.stop()
+        await transport.disconnect()
+        return response
     }
 
     // MARK: - Tool registration
