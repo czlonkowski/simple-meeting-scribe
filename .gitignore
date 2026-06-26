@@ -5,6 +5,10 @@
 build/
 DerivedData/
 *.xcodeproj/
+# …but DO track the project file itself (structure + SPM package links live in git)
+!MeetingTranscriber.xcodeproj/
+MeetingTranscriber.xcodeproj/*
+!MeetingTranscriber.xcodeproj/project.pbxproj
 .swiftpm/
 xcuserdata/
 Package.resolved
@@ -15,6 +19,7 @@ MeetingTranscriber/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png
 # Local agent / assistant working directories
 .agents/
 .claude/
+.superpowers/
 skills-lock.json
 
 # Release output
