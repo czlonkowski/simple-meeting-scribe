@@ -4,6 +4,7 @@ import MLX
 import MLXHuggingFace
 import MLXLLM
 import MLXLMCommon
+import MLXVLM
 import OSLog
 import Tokenizers
 
@@ -45,9 +46,11 @@ actor SummarizationEngine {
     private func configureMemoryBudgetOnce() {
         guard !configured else { return }
         configured = true
-        // 12 GB hard cap on MLX allocations. On a 32 GB M-series Mac this
-        // leaves ~20 GB for the OS, Whisper (CoreML/ANE), browser, etc.
-        let memLimitBytes = 12 * 1024 * 1024 * 1024
+        // 16 GB cap on MLX allocations — Gemma 4 12B 8-bit needs ~14 GB active.
+        // On a 32 GB M-series Mac this still leaves ~16 GB for the OS, Whisper
+        // (CoreML/ANE), browser, etc. memoryLimit is a soft recycle threshold,
+        // not a hard ceiling, so brief spikes on long transcripts are tolerated.
+        let memLimitBytes = 16 * 1024 * 1024 * 1024
         MLX.GPU.set(memoryLimit: memLimitBytes)
         // Keep the allocator cache tiny so memory is returned promptly.
         MLX.GPU.set(cacheLimit: 256 * 1024 * 1024)   // 256 MB
@@ -59,6 +62,32 @@ actor SummarizationEngine {
     /// the KV cache + intermediate buffers would otherwise hold on to.
     func releaseCaches() {
         MLX.Memory.clearCache()
+    }
+
+    /// Load `model`'s container through the correct MLX factory. Gemma 4 is a
+    /// VLM-class arch and must go through `VLMModelFactory`; Qwen text models
+    /// go through `LLMModelFactory`. Both return an `MLXLMCommon.ModelContainer`
+    /// that `ChatSession` drives identically for text-only generation.
+    private func loadContainer(
+        for model: LanguageModel,
+        progress: @escaping @Sendable (Progress) -> Void
+    ) async throws -> ModelContainer {
+        let config = ModelConfiguration(id: model.repoID)
+        if model.loadsViaVLMFactory {
+            return try await VLMModelFactory.shared.loadContainer(
+                from: #hubDownloader(),
+                using: #huggingFaceTokenizerLoader(),
+                configuration: config,
+                progressHandler: progress
+            )
+        } else {
+            return try await LLMModelFactory.shared.loadContainer(
+                from: #hubDownloader(),
+                using: #huggingFaceTokenizerLoader(),
+                configuration: config,
+                progressHandler: progress
+            )
+        }
     }
 
     // MARK: - Load / download
@@ -76,12 +105,7 @@ actor SummarizationEngine {
         activeModelID = nil
         MLX.Memory.clearCache() // free the previous model's buffers before loading the next
 
-        let config = ModelConfiguration(id: model.repoID)
-        let c = try await LLMModelFactory.shared.loadContainer(
-            from: #hubDownloader(),
-            using: #huggingFaceTokenizerLoader(),
-            configuration: config
-        ) { p in
+        let c = try await loadContainer(for: model) { p in
             progress(p.fractionCompleted)
         }
         self.container = c
@@ -97,13 +121,8 @@ actor SummarizationEngine {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         configureMemoryBudgetOnce()
-        Log.summary.notice("prefetch(\(model.shortName, privacy: .public)) — calling LLMModelFactory.loadContainer")
-        let config = ModelConfiguration(id: model.repoID)
-        _ = try await LLMModelFactory.shared.loadContainer(
-            from: #hubDownloader(),
-            using: #huggingFaceTokenizerLoader(),
-            configuration: config
-        ) { p in
+        Log.summary.notice("prefetch(\(model.shortName, privacy: .public)) — loading container")
+        _ = try await loadContainer(for: model) { p in
             Log.summary.debug(
                 "loadContainer progress fractionCompleted=\(p.fractionCompleted, privacy: .public) completed=\(p.completedUnitCount, privacy: .public) total=\(p.totalUnitCount, privacy: .public)"
             )
