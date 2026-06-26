@@ -1,80 +1,80 @@
 import Foundation
 
 /// Local LLMs used for transcript summarization. Identified by their
-/// HuggingFace repo ID — MLXLLM loads them through the standard
-/// `LLMModelFactory.shared.loadContainer(configuration:)` pathway.
+/// HuggingFace repo ID. Text-only models load through MLXLLM's
+/// `LLMModelFactory`; VLM-class models (Gemma 4 is `gemma4_unified`) load
+/// through `VLMModelFactory` — see `loadsViaVLMFactory`.
 enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
-    case qwen3_5_4b_mlx_8bit      = "mlx-community/Qwen3.5-4B-8bit"
-    case qwen3_5_9b_mlx_4bit      = "mlx-community/Qwen3.5-9B-MLX-4bit"
-    case bielik_11b_v3_mlx_8bit   = "speakleash/Bielik-11B-v3.0-Instruct-MLX-8bit"
-    case bielik_11b_v3_mlx_4bit   = "speakleash/Bielik-11B-v3.0-Instruct-MLX-4bit"
-    case bielik_4_5b_v3_mlx_8bit  = "speakleash/Bielik-4.5B-v3.0-Instruct-MLX-8bit"
+    case gemma4_12b_it_mlx_8bit = "mlx-community/gemma-4-12B-it-8bit"
+    case qwen3_5_4b_mlx_8bit    = "mlx-community/Qwen3.5-4B-8bit"
+    case qwen3_5_9b_mlx_4bit    = "mlx-community/Qwen3.5-9B-MLX-4bit"
 
     var id: String { rawValue }
     var repoID: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .qwen3_5_4b_mlx_8bit:     "Qwen3.5-4B 8-bit (English, ~1.5 GB)"
-        case .qwen3_5_9b_mlx_4bit:     "Qwen3.5-9B (English, ~5 GB — better quality)"
-        case .bielik_11b_v3_mlx_8bit:  "Bielik-11B v3.0 8-bit (Polish, ~12 GB — best quality)"
-        case .bielik_11b_v3_mlx_4bit:  "Bielik-11B v3.0 4-bit (Polish, ~6.5 GB)"
-        case .bielik_4_5b_v3_mlx_8bit: "Bielik-4.5B v3.0 (Polish, ~4 GB)"
+        case .gemma4_12b_it_mlx_8bit: "Gemma 4 12B 8-bit (Multilingual, ~13 GB — recommended)"
+        case .qwen3_5_4b_mlx_8bit:    "Qwen3.5-4B 8-bit (English, ~1.5 GB)"
+        case .qwen3_5_9b_mlx_4bit:    "Qwen3.5-9B (English, ~5 GB — better quality)"
         }
     }
 
     var approxDownloadGB: Double {
         switch self {
-        case .qwen3_5_4b_mlx_8bit:     1.5
-        case .qwen3_5_9b_mlx_4bit:     5.0
-        case .bielik_11b_v3_mlx_8bit:  12.0
-        case .bielik_11b_v3_mlx_4bit:  6.5
-        case .bielik_4_5b_v3_mlx_8bit: 4.0
+        case .gemma4_12b_it_mlx_8bit: 13.0
+        case .qwen3_5_4b_mlx_8bit:    1.5
+        case .qwen3_5_9b_mlx_4bit:    5.0
         }
     }
 
     var approxActiveMemoryGB: Double {
         switch self {
-        case .qwen3_5_4b_mlx_8bit:     4.0
-        case .qwen3_5_9b_mlx_4bit:     7.0
-        case .bielik_11b_v3_mlx_8bit:  14.0
-        case .bielik_11b_v3_mlx_4bit:  8.0
-        case .bielik_4_5b_v3_mlx_8bit: 5.0
+        case .gemma4_12b_it_mlx_8bit: 14.0
+        case .qwen3_5_4b_mlx_8bit:    4.0
+        case .qwen3_5_9b_mlx_4bit:    7.0
         }
     }
 
     var supportedLanguages: Set<TranscriptionLanguage> {
         switch self {
+        // Gemma 4 is multilingual (140+ languages pretrained, Polish included).
+        case .gemma4_12b_it_mlx_8bit: [.polish, .english]
         case .qwen3_5_4b_mlx_8bit,
-             .qwen3_5_9b_mlx_4bit:     [.english]
-        // Bielik officially supports 40+ languages; allow EN too.
-        case .bielik_11b_v3_mlx_8bit,
-             .bielik_11b_v3_mlx_4bit,
-             .bielik_4_5b_v3_mlx_8bit: [.polish, .english]
+             .qwen3_5_9b_mlx_4bit:    [.english]
         }
     }
 
     var shortName: String {
         switch self {
-        case .qwen3_5_4b_mlx_8bit:     "qwen3.5-4b-8bit"
-        case .qwen3_5_9b_mlx_4bit:     "qwen3.5-9b"
-        case .bielik_11b_v3_mlx_8bit:  "bielik-11b-v3-8bit"
-        case .bielik_11b_v3_mlx_4bit:  "bielik-11b-v3-4bit"
-        case .bielik_4_5b_v3_mlx_8bit: "bielik-4.5b-v3"
+        case .gemma4_12b_it_mlx_8bit: "gemma4-12b-8bit"
+        case .qwen3_5_4b_mlx_8bit:    "qwen3.5-4b-8bit"
+        case .qwen3_5_9b_mlx_4bit:    "qwen3.5-9b"
         }
     }
 
     /// Qwen3 / Qwen3.5 ship a hybrid reasoning mode that emits `<think>…</think>`
-    /// tool-thought blocks before the answer. For summarization we only want the
-    /// final answer, so we pass `enable_thinking=false` through the chat template
-    /// context and also strip any leaked thought tags at display time.
+    /// blocks before the answer. For summarization we only want the final
+    /// answer, so we pass `enable_thinking=false` through the chat template
+    /// context and strip leaked thought tags at display time. Gemma 4 has no
+    /// such mode.
     var usesThinkingMode: Bool {
         switch self {
+        case .gemma4_12b_it_mlx_8bit: false
         case .qwen3_5_4b_mlx_8bit,
-             .qwen3_5_9b_mlx_4bit:     true
-        case .bielik_11b_v3_mlx_8bit,
-             .bielik_11b_v3_mlx_4bit,
-             .bielik_4_5b_v3_mlx_8bit: false
+             .qwen3_5_9b_mlx_4bit:    true
+        }
+    }
+
+    /// Gemma 4 (`gemma4_unified`) is a VLM-class architecture and is NOT in the
+    /// text-only `LLMModelFactory` registry — it must load through
+    /// `VLMModelFactory`. Text-only generation works fine on the resulting
+    /// container (no image input). Qwen text models load via `LLMModelFactory`.
+    var loadsViaVLMFactory: Bool {
+        switch self {
+        case .gemma4_12b_it_mlx_8bit: true
+        case .qwen3_5_4b_mlx_8bit,
+             .qwen3_5_9b_mlx_4bit:    false
         }
     }
 }
