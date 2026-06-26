@@ -139,3 +139,33 @@ struct TranscriptDocument: Codable, Identifiable, Hashable {
         case imported
     }
 }
+
+extension TranscriptDocument {
+    /// Custom decoder that tolerates a `summaryModelOverride` referring to a
+    /// model that no longer exists (e.g. a removed Bielik repo ID): it decodes
+    /// to `nil` rather than throwing, so old transcripts still load. All other
+    /// fields decode exactly as the synthesized initializer would.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        date = try c.decode(Date.self, forKey: .date)
+        recordedAt = try c.decodeIfPresent(Date.self, forKey: .recordedAt)
+        duration = try c.decode(TimeInterval.self, forKey: .duration)
+        language = try c.decode(TranscriptionLanguage.self, forKey: .language)
+        modelShortName = try c.decode(String.self, forKey: .modelShortName)
+        sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL)
+        sourceKind = try c.decode(SourceKind.self, forKey: .sourceKind)
+        speakers = try c.decode([SpeakerLabel].self, forKey: .speakers)
+        segments = try c.decode([TranscriptSegment].self, forKey: .segments)
+        audioFileName = try c.decodeIfPresent(String.self, forKey: .audioFileName)
+        videoFileName = try c.decodeIfPresent(String.self, forKey: .videoFileName)
+        videoStartOffset = try c.decodeIfPresent(Double.self, forKey: .videoStartOffset)
+        summary = try c.decodeIfPresent(String.self, forKey: .summary)
+        summaryModelShortName = try c.decodeIfPresent(String.self, forKey: .summaryModelShortName)
+        summaryGeneratedAt = try c.decodeIfPresent(Date.self, forKey: .summaryGeneratedAt)
+        // Lenient: present-but-unknown rawValue throws inside decodeIfPresent,
+        // which `try?` turns into nil; absent key also yields nil.
+        summaryModelOverride = (try? c.decodeIfPresent(LanguageModel.self, forKey: .summaryModelOverride)) ?? nil
+    }
+}
