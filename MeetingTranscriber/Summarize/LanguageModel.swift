@@ -2,54 +2,54 @@ import Foundation
 
 /// Local LLMs used for transcript summarization. Identified by their
 /// HuggingFace repo ID. Text-only models load through MLXLLM's
-/// `LLMModelFactory`; VLM-class models (Gemma 4 is `gemma4_unified`) load
-/// through `VLMModelFactory` — see `loadsViaVLMFactory`.
+/// `LLMModelFactory`; VLM-class models (Gemma 4 is `gemma4`) load through
+/// `VLMModelFactory` — see `loadsViaVLMFactory`.
 enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
-    case gemma4_12b_it_mlx_8bit = "mlx-community/gemma-4-12B-it-8bit"
-    case qwen3_5_4b_mlx_8bit    = "mlx-community/Qwen3.5-4B-8bit"
-    case qwen3_5_9b_mlx_4bit    = "mlx-community/Qwen3.5-9B-MLX-4bit"
+    case gemma4_26b_a4b_it_mlx_4bit = "mlx-community/gemma-4-26b-a4b-it-4bit"
+    case qwen3_5_4b_mlx_8bit        = "mlx-community/Qwen3.5-4B-8bit"
+    case qwen3_5_9b_mlx_4bit        = "mlx-community/Qwen3.5-9B-MLX-4bit"
 
     var id: String { rawValue }
     var repoID: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: "Gemma 4 12B 8-bit (Multilingual, ~13 GB — recommended)"
-        case .qwen3_5_4b_mlx_8bit:    "Qwen3.5-4B 8-bit (English, ~1.5 GB)"
-        case .qwen3_5_9b_mlx_4bit:    "Qwen3.5-9B (English, ~5 GB — better quality)"
+        case .gemma4_26b_a4b_it_mlx_4bit: "Gemma 4 26B-A4B 4-bit (Multilingual MoE, ~14 GB — recommended)"
+        case .qwen3_5_4b_mlx_8bit:        "Qwen3.5-4B 8-bit (English, ~1.5 GB)"
+        case .qwen3_5_9b_mlx_4bit:        "Qwen3.5-9B (English, ~5 GB — better quality)"
         }
     }
 
     var approxDownloadGB: Double {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: 13.0
-        case .qwen3_5_4b_mlx_8bit:    1.5
-        case .qwen3_5_9b_mlx_4bit:    5.0
+        case .gemma4_26b_a4b_it_mlx_4bit: 14.0
+        case .qwen3_5_4b_mlx_8bit:        1.5
+        case .qwen3_5_9b_mlx_4bit:        5.0
         }
     }
 
     var approxActiveMemoryGB: Double {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: 14.0
-        case .qwen3_5_4b_mlx_8bit:    4.0
-        case .qwen3_5_9b_mlx_4bit:    7.0
+        case .gemma4_26b_a4b_it_mlx_4bit: 15.0
+        case .qwen3_5_4b_mlx_8bit:        4.0
+        case .qwen3_5_9b_mlx_4bit:        7.0
         }
     }
 
     var supportedLanguages: Set<TranscriptionLanguage> {
         switch self {
         // Gemma 4 is multilingual (140+ languages pretrained, Polish included).
-        case .gemma4_12b_it_mlx_8bit: [.polish, .english]
+        case .gemma4_26b_a4b_it_mlx_4bit: [.polish, .english]
         case .qwen3_5_4b_mlx_8bit,
-             .qwen3_5_9b_mlx_4bit:    [.english]
+             .qwen3_5_9b_mlx_4bit:        [.english]
         }
     }
 
     var shortName: String {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: "gemma4-12b-8bit"
-        case .qwen3_5_4b_mlx_8bit:    "qwen3.5-4b-8bit"
-        case .qwen3_5_9b_mlx_4bit:    "qwen3.5-9b"
+        case .gemma4_26b_a4b_it_mlx_4bit: "gemma4-26b-a4b-4bit"
+        case .qwen3_5_4b_mlx_8bit:        "qwen3.5-4b-8bit"
+        case .qwen3_5_9b_mlx_4bit:        "qwen3.5-9b"
         }
     }
 
@@ -60,21 +60,21 @@ enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
     /// such mode.
     var usesThinkingMode: Bool {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: false
+        case .gemma4_26b_a4b_it_mlx_4bit: false
         case .qwen3_5_4b_mlx_8bit,
-             .qwen3_5_9b_mlx_4bit:    true
+             .qwen3_5_9b_mlx_4bit:        true
         }
     }
 
-    /// Gemma 4 (`gemma4_unified`) is a VLM-class architecture and is NOT in the
+    /// Gemma 4 (`gemma4`) is a VLM-class architecture and is NOT in the
     /// text-only `LLMModelFactory` registry — it must load through
     /// `VLMModelFactory`. Text-only generation works fine on the resulting
     /// container (no image input). Qwen text models load via `LLMModelFactory`.
     var loadsViaVLMFactory: Bool {
         switch self {
-        case .gemma4_12b_it_mlx_8bit: true
+        case .gemma4_26b_a4b_it_mlx_4bit: true
         case .qwen3_5_4b_mlx_8bit,
-             .qwen3_5_9b_mlx_4bit:    false
+             .qwen3_5_9b_mlx_4bit:        false
         }
     }
 }
