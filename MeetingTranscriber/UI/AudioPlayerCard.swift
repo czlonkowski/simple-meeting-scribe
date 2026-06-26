@@ -27,6 +27,43 @@ final class TranscriptAudioPlayer {
     var isPlaying: Bool = false
     var hasSystemTrack: Bool { systemFile != nil }
 
+    // Screen-recording follower. The audio engine stays the master clock; the
+    // muted AVPlayer is re-seeked whenever it drifts. The video file carries
+    // no audio track — the WAV stems are the only audio source.
+    private(set) var videoPlayer: AVPlayer?
+    private var videoOffset: TimeInterval = 0
+    var videoURL: URL?
+
+    func attachVideo(url: URL, offset: TimeInterval) {
+        guard videoURL != url else { return }
+        let p = AVPlayer(url: url)
+        p.isMuted = true
+        p.actionAtItemEnd = .pause
+        videoPlayer = p
+        videoOffset = max(0, offset)
+        videoURL = url
+        syncVideo(hard: true)
+    }
+
+    private func detachVideo() {
+        videoPlayer?.pause()
+        videoPlayer = nil
+        videoURL = nil
+        videoOffset = 0
+    }
+
+    /// Re-seek the follower when explicitly requested (`hard`) or when it has
+    /// drifted more than 0.3 s from the audio clock (= 3 frames at 10 fps).
+    private func syncVideo(hard: Bool) {
+        guard let videoPlayer else { return }
+        let target = max(0, currentTime - videoOffset)
+        let drift = abs(videoPlayer.currentTime().seconds - target)
+        if hard || drift > 0.3 {
+            videoPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600),
+                             toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+    }
+
     init() {
         engine.attach(voicePlayer)
         engine.attach(systemPlayer)
@@ -59,6 +96,7 @@ final class TranscriptAudioPlayer {
 
     func unload() {
         stopTicker()
+        detachVideo()
         voicePlayer.stop()
         systemPlayer.stop()
         if engine.isRunning { engine.stop() }
@@ -78,6 +116,7 @@ final class TranscriptAudioPlayer {
         if isPlaying {
             voicePlayer.pause()
             systemPlayer.pause()
+            videoPlayer?.pause()
             isPlaying = false
             stopTicker()
         } else {
@@ -90,6 +129,8 @@ final class TranscriptAudioPlayer {
                 currentTime = 0
             }
             playBothNodesSynced()
+            syncVideo(hard: true)
+            videoPlayer?.play()
             isPlaying = true
             startTicker()
         }
@@ -103,9 +144,12 @@ final class TranscriptAudioPlayer {
         systemPlayer.stop()
         scheduleSegments(from: clamped)
         currentTime = clamped
+        syncVideo(hard: true)
         if wasPlaying {
             playBothNodesSynced()
+            videoPlayer?.play()
         } else {
+            videoPlayer?.pause()
             isPlaying = false
         }
     }
@@ -161,9 +205,11 @@ final class TranscriptAudioPlayer {
               playerTime.sampleRate > 0 else { return }
         let played = Double(playerTime.sampleTime) / playerTime.sampleRate
         currentTime = min(duration, scheduledStartOffset + max(0, played))
+        syncVideo(hard: false)
         if currentTime >= duration - 0.01 {
             voicePlayer.pause()
             systemPlayer.pause()
+            videoPlayer?.pause()
             isPlaying = false
             stopTicker()
         }
@@ -175,36 +221,47 @@ struct AudioPlayerCard: View {
 
     var body: some View {
         GlassCard(padding: 14) {
-            HStack(spacing: 14) {
-                Button {
-                    player.togglePlay()
-                } label: {
-                    Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 34, weight: .regular))
-                        .foregroundStyle(Theme.accent)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.space, modifiers: [])
-                .help(player.isPlaying ? "Pause" : "Play")
+            PlayerTransportRow(player: player)
+        }
+    }
+}
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Slider(
-                        value: Binding(
-                            get: { player.currentTime },
-                            set: { player.seek(to: $0) }
-                        ),
-                        in: 0...max(player.duration, 0.01)
-                    )
-                    HStack {
-                        Text(Self.formatTime(player.currentTime))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(Self.formatTime(player.duration))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.tertiary)
-                    }
+/// Shared transport controls (play/pause, scrubber, time labels) used by both
+/// the audio-only card and the video card. Driving `TranscriptAudioPlayer`
+/// moves the attached video follower too.
+struct PlayerTransportRow: View {
+    @Bindable var player: TranscriptAudioPlayer
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Button {
+                player.togglePlay()
+            } label: {
+                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 34, weight: .regular))
+                    .foregroundStyle(Theme.accent)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.space, modifiers: [])
+            .help(player.isPlaying ? "Pause" : "Play")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Slider(
+                    value: Binding(
+                        get: { player.currentTime },
+                        set: { player.seek(to: $0) }
+                    ),
+                    in: 0...max(player.duration, 0.01)
+                )
+                HStack {
+                    Text(Self.formatTime(player.currentTime))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(Self.formatTime(player.duration))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
                 }
             }
         }

@@ -4,6 +4,8 @@ enum TranscriptFormatter {
 
     static func renderMarkdown(_ doc: TranscriptDocument) -> String {
         let isoDate = ISO8601DateFormatter().string(from: doc.date)
+        let recordedFront = doc.recordedAt
+            .map { "recorded: \(ISO8601DateFormatter().string(from: $0))\n" } ?? ""
         var speakersYaml = ""
         for s in doc.speakers {
             speakersYaml += "  - { id: \(s.id), name: \"\(escape(s.name))\" }\n"
@@ -14,7 +16,7 @@ enum TranscriptFormatter {
         id: \(doc.id)
         title: \(escape(doc.title))
         date: \(isoDate)
-        duration: \(formatDuration(doc.duration))
+        \(recordedFront)duration: \(formatDuration(doc.duration))
         language: \(doc.language.rawValue)
         model: \(doc.modelShortName)
         source_kind: \(doc.sourceKind.rawValue)
@@ -24,6 +26,10 @@ enum TranscriptFormatter {
         # \(doc.title)
 
         """
+
+        if let recordedAt = doc.recordedAt {
+            out += "\n**Recorded:** \(recordedAt.formatted(date: .long, time: .omitted))\n"
+        }
 
         if let summary = doc.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
            !summary.isEmpty {

@@ -69,6 +69,77 @@ enum TranscriptMerger {
         return (out, speakers)
     }
 
+    /// Map a single diarized transcription (the combined-mix cloud path) to
+    /// app speakers. `diarization` is parallel to `segments` (one entry per
+    /// segment). `voiceActivity` — speech intervals from the mic stem — picks
+    /// out which diarized speaker is "You"; the rest become "Remote …" as in
+    /// `mergeStems`. With no usable mic activity (e.g. imported files) the
+    /// speakers are labeled "Speaker 1..N".
+    static func mapDiarizedSingle(segments: [WhisperSegment],
+                                  diarization: [DiarizedSegment],
+                                  voiceActivity: [(start: Double, end: Double)])
+        -> (segments: [TranscriptSegment], speakers: [SpeakerLabel]) {
+
+        guard !segments.isEmpty else { return ([], []) }
+        guard segments.count == diarization.count else {
+            // No per-segment speaker info — single anonymous speaker.
+            let segs = segments.map {
+                TranscriptSegment(start: $0.start, end: $0.end, speakerId: 1, text: $0.text)
+            }
+            return (segs, [SpeakerLabel(id: 1, name: "Speaker 1")])
+        }
+
+        // Per raw speaker: total speech time and overlap with mic activity.
+        var speechDur: [Int: Double] = [:]
+        var micOverlap: [Int: Double] = [:]
+        var firstSeen: [Int: Double] = [:]
+        for d in diarization {
+            speechDur[d.speakerId, default: 0] += d.end - d.start
+            if firstSeen[d.speakerId] == nil { firstSeen[d.speakerId] = d.start }
+            for v in voiceActivity {
+                micOverlap[d.speakerId, default: 0]
+                    += max(0, min(d.end, v.end) - max(d.start, v.start))
+            }
+        }
+
+        // "You" = the speaker whose speech best coincides with mic activity.
+        // Requires a meaningful match so a silent user doesn't grab the label.
+        let youRawID: Int? = speechDur.keys
+            .map { id -> (id: Int, overlap: Double, ratio: Double) in
+                let overlap = micOverlap[id] ?? 0
+                return (id, overlap, overlap / max(speechDur[id] ?? 0, 0.001))
+            }
+            .filter { $0.overlap >= 2.0 && $0.ratio >= 0.4 }
+            .max(by: { $0.ratio < $1.ratio })?.id
+
+        // Assign app ids in order of first appearance.
+        let rawInOrder = firstSeen.sorted { $0.value < $1.value }.map(\.key)
+        var idMap: [Int: Int] = [:]
+        var speakers: [SpeakerLabel] = []
+        if let you = youRawID {
+            idMap[you] = 1
+            speakers.append(SpeakerLabel(id: 1, name: "You"))
+            let remotes = rawInOrder.filter { $0 != you }
+            for (offset, raw) in remotes.enumerated() {
+                idMap[raw] = offset + 2
+                speakers.append(SpeakerLabel(id: offset + 2,
+                                             name: remotes.count == 1 ? "Remote" : "Remote \(offset + 1)"))
+            }
+        } else {
+            for (offset, raw) in rawInOrder.enumerated() {
+                idMap[raw] = offset + 1
+                speakers.append(SpeakerLabel(id: offset + 1, name: "Speaker \(offset + 1)"))
+            }
+        }
+
+        let segs = zip(segments, diarization).map { seg, d in
+            TranscriptSegment(start: seg.start, end: seg.end,
+                              speakerId: idMap[d.speakerId] ?? -1,
+                              text: seg.text)
+        }
+        return (segs, speakers)
+    }
+
     // MARK: helpers
 
     private static func bestRawSpeakerID(for w: WhisperSegment, in diary: [DiarizedSegment]) -> Int? {

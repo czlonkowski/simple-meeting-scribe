@@ -9,10 +9,16 @@ enum SidebarItem: Hashable {
 struct RootView: View {
     @Environment(AppState.self) private var appState
 
+    /// Sheet-item wrapper for a file awaiting import options (engine + language).
+    private struct PendingImport: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
+
     @State private var selection: SidebarItem? = .record
     @State private var query: String = ""
     @State private var showFileImporter: Bool = false
-    @State private var pendingImportURL: URL? = nil
+    @State private var pendingImport: PendingImport? = nil
     @State private var pendingDelete: TranscriptDocument? = nil
     /// When false (the default), recordings under `ghostDurationThreshold`
     /// with no usable segments are hidden from the sidebar — see
@@ -87,20 +93,11 @@ struct RootView: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let first = urls.first {
-                pendingImportURL = first
+                pendingImport = PendingImport(url: first)
             }
         }
-        .confirmationDialog(
-            "Language of \(pendingImportURL?.lastPathComponent ?? "file")",
-            isPresented: Binding(
-                get: { pendingImportURL != nil },
-                set: { if !$0 { pendingImportURL = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("🇬🇧 English") { startImport(language: .english) }
-            Button("🇵🇱 Polski") { startImport(language: .polish) }
-            Button("Cancel", role: .cancel) { pendingImportURL = nil }
+        .sheet(item: $pendingImport) { pending in
+            ImportFileSheet(url: pending.url)
         }
         .alert(
             "Something went wrong",
@@ -142,7 +139,7 @@ struct RootView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard let first = urls.first else { return false }
-            pendingImportURL = first
+            pendingImport = PendingImport(url: first)
             return true
         }
     }
@@ -160,6 +157,16 @@ struct RootView: View {
                     ForEach(filteredTranscripts) { doc in
                         TranscriptListRow(doc: doc)
                             .tag(SidebarItem.transcript(doc.id))
+                            // Two-finger swipe left reveals Delete; a full
+                            // swipe deletes outright (no confirmation —
+                            // matching the swipe-to-delete idiom).
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    appState.deleteTranscript(id: doc.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                             .contextMenu {
                                 Button("Reveal in Finder") {
                                     NSWorkspace.shared.activateFileViewerSelecting(
@@ -210,10 +217,4 @@ struct RootView: View {
         }
     }
 
-    // MARK: – Import helpers
-    private func startImport(language: TranscriptionLanguage) {
-        guard let url = pendingImportURL else { return }
-        pendingImportURL = nil
-        Task { await appState.importFile(url: url, language: language) }
-    }
 }

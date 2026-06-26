@@ -72,6 +72,14 @@ struct RecordView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 440)
+            Button {
+                appState.importPanelRequested.toggle()
+            } label: {
+                Label("Browse Files…", systemImage: "folder")
+            }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .help("Pick an audio or video file to transcribe")
         }
     }
 
@@ -112,6 +120,18 @@ struct RecordView: View {
                     Text("·").foregroundStyle(.tertiary)
                     Label("Mic muted", systemImage: "mic.slash.fill")
                         .foregroundStyle(.orange)
+                }
+                switch appState.videoCaptureStatus {
+                case .recording(let windowDescription):
+                    Text("·").foregroundStyle(.tertiary)
+                    Label("Recording \(windowDescription)", systemImage: "video.badge.checkmark")
+                        .foregroundStyle(.secondary)
+                case .unavailable:
+                    Text("·").foregroundStyle(.tertiary)
+                    Label("No screen video", systemImage: "video.slash")
+                        .foregroundStyle(.orange)
+                case .off:
+                    EmptyView()
                 }
             }
             .font(.headline)
@@ -200,6 +220,12 @@ struct RecordView: View {
                 }
                 .toggleStyle(.switch)
 
+                Toggle(isOn: recordScreenBinding) {
+                    Label("Record screen", systemImage: "video.fill")
+                }
+                .toggleStyle(.switch)
+                .help("Record the meeting's browser window as video")
+
                 Spacer()
 
                 Button {
@@ -224,6 +250,20 @@ struct RecordView: View {
                 .controlSize(.large)
                 .keyboardShortcut("m", modifiers: [.command, .shift])
 
+                // Turn on screen recording mid-meeting. Hidden once video is
+                // rolling; .unavailable keeps it visible so a retry is one
+                // click away (e.g. after opening the meeting window).
+                if !videoIsRecording {
+                    Button {
+                        Task { await appState.startScreenCaptureNow() }
+                    } label: {
+                        Label("Record screen", systemImage: "video.fill")
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .help("Start recording the meeting window now")
+                }
+
                 Spacer()
 
                 Button {
@@ -241,6 +281,18 @@ struct RecordView: View {
                 EmptyView()
             }
         }
+    }
+
+    private var recordScreenBinding: Binding<Bool> {
+        Binding(
+            get: { appState.recordScreen },
+            set: { appState.setRecordScreen($0) }
+        )
+    }
+
+    private var videoIsRecording: Bool {
+        if case .recording = appState.videoCaptureStatus { return true }
+        return false
     }
 
     private var elapsedString: String {

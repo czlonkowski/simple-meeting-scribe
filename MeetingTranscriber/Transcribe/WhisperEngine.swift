@@ -85,6 +85,10 @@ actor WhisperEngine {
     }
 
     private func pipeline(for model: WhisperModel) async throws -> WhisperKit {
+        // Cloud models have no WhisperKit folder; reaching here means the
+        // pipeline mis-routed the job. Fail loudly instead of asking
+        // WhisperKit to download a nonexistent repo.
+        precondition(!model.isCloud, "cloud model \(model.rawValue) routed to WhisperEngine")
         if let p = pipelines[model] { return p }
         NSLog("Whisper: loading pipeline \"%@\"", model.rawValue)
         let config = WhisperKitConfig(

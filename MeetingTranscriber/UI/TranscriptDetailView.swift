@@ -15,6 +15,8 @@ struct TranscriptDetailView: View {
     @State private var showingCustomPromptPopover: Bool = false
     @State private var customSummaryPrompt: String = ""
     @State private var transcriptExpanded: Bool = false
+    @State private var showDateEditor: Bool = false
+    @State private var recordedDraft: Date = Date()
     /// Per-summary glossary toggle. Defaults to true whenever any glossary
     /// entry is enabled; resets on each detail-view appearance.
     @State private var useGlossaryThisRun: Bool = true
@@ -49,6 +51,9 @@ struct TranscriptDetailView: View {
         if let voice = TranscriptStore.shared.audioURL(for: doc) {
             let system = TranscriptStore.shared.systemAudioURL(for: doc)
             audioPlayer.load(voiceURL: voice, systemURL: system)
+            if let video = TranscriptStore.shared.videoURL(for: doc) {
+                audioPlayer.attachVideo(url: video, offset: doc.videoStartOffset ?? 0)
+            }
         } else {
             audioPlayer.unload()
         }
@@ -59,7 +64,9 @@ struct TranscriptDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 headerBlock(for: doc)
-                if audioPlayer.url != nil {
+                if audioPlayer.videoURL != nil {
+                    VideoPlayerCard(player: audioPlayer)
+                } else if audioPlayer.url != nil {
                     AudioPlayerCard(player: audioPlayer)
                 }
                 speakersBlock(for: doc)
@@ -104,8 +111,19 @@ struct TranscriptDetailView: View {
                 }
 
             HStack(spacing: 8) {
-                Label(doc.date.formatted(date: .abbreviated, time: .shortened),
-                      systemImage: "calendar")
+                Button {
+                    recordedDraft = doc.displayDate
+                    showDateEditor = true
+                } label: {
+                    Label(dateLabelText(for: doc), systemImage: "calendar")
+                }
+                .buttonStyle(.plain)
+                .help(doc.recordedAt != nil
+                      ? "Recorded \(doc.displayDate.formatted(date: .abbreviated, time: .omitted)) · transcribed \(doc.date.formatted(date: .abbreviated, time: .shortened)). Click to edit."
+                      : "Transcribed \(doc.date.formatted(date: .abbreviated, time: .shortened)). Click to set the recording date.")
+                .popover(isPresented: $showDateEditor, arrowEdge: .bottom) {
+                    dateEditorPopover(for: doc)
+                }
                 Text("·")
                 Label(formatDuration(doc.duration), systemImage: "clock")
                 Text("·")
@@ -127,6 +145,41 @@ struct TranscriptDetailView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+    }
+
+    /// Recording date shows date-only (it's day-level); the transcription-date
+    /// fallback keeps its time, which is meaningful.
+    private func dateLabelText(for doc: TranscriptDocument) -> String {
+        doc.recordedAt != nil
+            ? doc.displayDate.formatted(date: .abbreviated, time: .omitted)
+            : doc.displayDate.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    @ViewBuilder
+    private func dateEditorPopover(for doc: TranscriptDocument) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recording date")
+                .font(.headline)
+            DatePicker("", selection: $recordedDraft, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+            HStack {
+                if doc.recordedAt != nil {
+                    Button("Clear") {
+                        appState.setRecordedAt(nil, for: documentID)
+                        showDateEditor = false
+                    }
+                }
+                Spacer()
+                Button("Set") {
+                    appState.setRecordedAt(recordedDraft, for: documentID)
+                    showDateEditor = false
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(width: 300)
     }
 
     // MARK: – Speakers
@@ -377,34 +430,35 @@ struct TranscriptDetailView: View {
         appState.processingJobs.first(where: { $0.replacingDocumentID == documentID })
     }
 
-    /// The Whisper model we'd upgrade to. Only offer a re-run when the
-    /// existing transcript used Turbo — there's no point downgrading to a
-    /// smaller model.
-    private func retranscribeTarget(for doc: TranscriptDocument) -> WhisperModel? {
-        doc.modelShortName == WhisperModel.largeV3Turbo.shortName ? .largeV3 : nil
+    /// Every model except the one this transcript was made with — re-running
+    /// with the same model would just reproduce the result.
+    private func retranscribeTargets(for doc: TranscriptDocument) -> [WhisperModel] {
+        WhisperModel.allCases.filter { $0.shortName != doc.modelShortName }
     }
 
     @ViewBuilder
     private func retranscribeButton(for doc: TranscriptDocument) -> some View {
-        if let target = retranscribeTarget(for: doc) {
-            if let job = activeRetranscribeJob {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
-                    Text(retranscribeProgressLabel(for: job))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else if TranscriptStore.shared.audioURL(for: doc) != nil {
-                Button {
-                    appState.retranscribe(documentID: documentID, with: target)
-                } label: {
-                    Label("Re-transcribe with \(target.shortName)",
-                          systemImage: "arrow.triangle.2.circlepath")
-                }
-                .buttonStyle(.glass)
-                .controlSize(.small)
-                .help("Run transcription again with a larger model. Replaces segments and speakers; clears the summary.")
+        if let job = activeRetranscribeJob {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(retranscribeProgressLabel(for: job))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+        } else if TranscriptStore.shared.audioURL(for: doc) != nil {
+            Menu {
+                ForEach(retranscribeTargets(for: doc)) { target in
+                    Button(target.isCloud ? "with ElevenLabs Scribe v2 (cloud)"
+                                          : "with Whisper \(target.shortName)") {
+                        appState.retranscribe(documentID: documentID, with: target)
+                    }
+                }
+            } label: {
+                Label("Re-transcribe", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+            .help("Run transcription again with a different model. Replaces segments and speakers; clears the summary.")
         }
     }
 

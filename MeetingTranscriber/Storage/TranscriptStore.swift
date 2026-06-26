@@ -26,6 +26,13 @@ final class TranscriptStore {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    /// Resolve the screen recording for a transcript, if one exists on disk.
+    func videoURL(for doc: TranscriptDocument) -> URL? {
+        guard let name = doc.videoFileName else { return nil }
+        let url = recordingsDir.appendingPathComponent(name)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
     /// Derive the path of the `<base>.system.wav` stem paired with a voice
     /// filename of the form `<base>.voice.wav`. Returns nil for anything that
     /// isn't a live-recording stem.
@@ -34,6 +41,18 @@ final class TranscriptStore {
         guard withoutWav.hasSuffix(".voice") else { return nil }
         let stem = String(withoutWav.dropLast(".voice".count))
         return recordingsDir.appendingPathComponent("\(stem).system.wav")
+    }
+
+    /// Derive the `<base>.video.mp4` / `<base>.video.mov` paths paired with a
+    /// voice filename. Used as belt-and-braces cleanup alongside the explicit
+    /// `videoFileName` so orphaned videos are removed too.
+    private func pairedVideoURLs(forVoiceFilename voice: String) -> [URL] {
+        let withoutWav = (voice as NSString).deletingPathExtension      // "...voice"
+        guard withoutWav.hasSuffix(".voice") else { return [] }
+        let stem = String(withoutWav.dropLast(".voice".count))
+        return ["mp4", "mov"].map {
+            recordingsDir.appendingPathComponent("\(stem).video.\($0)")
+        }
     }
 
     /// Remove every file belonging to a transcript — markdown, JSON, and the
@@ -51,6 +70,12 @@ final class TranscriptStore {
             if let systemURL = pairedSystemURL(forVoiceFilename: voice) {
                 try? fm.removeItem(at: systemURL)
             }
+            for videoURL in pairedVideoURLs(forVoiceFilename: voice) {
+                try? fm.removeItem(at: videoURL)
+            }
+        }
+        if let video = doc.videoFileName {
+            try? fm.removeItem(at: recordingsDir.appendingPathComponent(video))
         }
     }
 

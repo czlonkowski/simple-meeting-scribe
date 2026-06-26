@@ -3,6 +3,8 @@ import Observation
 import SwiftUI
 import AppKit
 
+private let recordScreenKey = "recordScreenByDefault"
+
 @MainActor
 @Observable
 final class AppState {
@@ -10,6 +12,23 @@ final class AppState {
     var selectedModel: WhisperModel = .largeV3Turbo
     var defaultLanguage: TranscriptionLanguage = .english
     var captureSystemAudio: Bool = true
+
+    /// Record the meeting's browser window as screen video. Persisted across
+    /// launches (unlike `captureSystemAudio`, which intentionally resets).
+    var recordScreen: Bool = UserDefaults.standard.object(forKey: recordScreenKey) as? Bool ?? false
+
+    func setRecordScreen(_ value: Bool) {
+        recordScreen = value
+        UserDefaults.standard.set(value, forKey: recordScreenKey)
+    }
+
+    /// ElevenLabs API key for Scribe v2 (persisted in the macOS Keychain).
+    var elevenLabsAPIKey: String = ScribeStore.loadAPIKey() ?? ""
+
+    func setElevenLabsAPIKey(_ value: String) {
+        elevenLabsAPIKey = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        ScribeStore.saveAPIKey(elevenLabsAPIKey)
+    }
 
     // MARK: – Dictionary (persisted via DictionaryStore)
     var languagePrimes: [String: String] = DictionaryStore.loadPrimes()
@@ -376,9 +395,14 @@ final class AppState {
                         summary: finalizedSummary)
                 }
                 var titleText = ""
+                // Title from the just-generated summary, not the transcript:
+                // the model is still hot, and a ≤600-token prompt prefills in
+                // a blink where re-feeding an hour of transcript took as long
+                // as the summary pass itself.
                 let titlePrompt =
                     SummaryPrompts.titleInstruction(for: language)
-                    + "\n\nTranscript:\n" + feed
+                    + "\n\nSummary:\n"
+                    + (finalizedSummary.isEmpty ? feed : finalizedSummary)
                 let titleStream = try await summaryEngine.stream(
                     prompt: titlePrompt,
                     instructions: systemPrompt,
@@ -509,6 +533,8 @@ final class AppState {
     /// (e.g. "MacBook Pro Microphone", "AirPods Pro"). Nil when not recording
     /// or when CoreAudio can't resolve the device.
     var currentInputDeviceName: String? = nil
+    /// Live state of the screen-video capture for the current recording.
+    var videoCaptureStatus: VideoCaptureStatus = .off
 
     // MARK: – Background processing queue
     /// One transcription job — either a freshly captured recording or an
@@ -517,7 +543,8 @@ final class AppState {
     struct ProcessingJob: Identifiable, Equatable {
         enum Input: Equatable {
             /// Stems already on disk (from RecordingCoordinator).
-            case liveStems(voiceURL: URL, systemURL: URL?, duration: TimeInterval)
+            case liveStems(voiceURL: URL, systemURL: URL?, duration: TimeInterval,
+                           videoURL: URL?, videoStartOffset: TimeInterval?)
             /// User-imported media; needs decode → mono 16kHz WAV first.
             case importFile(sourceURL: URL)
         }
@@ -541,8 +568,9 @@ final class AppState {
         /// overwrites that document in place (preserving the id + title,
         /// clearing any now-stale summary).
         let replacingDocumentID: String?
-        /// Forces a specific Whisper model for this job regardless of the
-        /// user's global `selectedModel`. Used by Re-transcribe.
+        /// Forces a specific transcription model (local Whisper or cloud
+        /// Scribe) for this job regardless of the user's global
+        /// `selectedModel`. Used by Re-transcribe.
         let modelOverride: WhisperModel?
         var stage: Stage
         let createdAt: Date
@@ -593,7 +621,7 @@ final class AppState {
     func loadTranscripts() async {
         do {
             let loaded = try TranscriptStore.shared.loadAll()
-            self.transcripts = loaded.sorted { $0.date > $1.date }
+            self.transcripts = loaded.sorted { $0.displayDate > $1.displayDate }
         } catch {
             self.lastError = "Could not load transcripts: \(error.localizedDescription)"
         }
@@ -629,9 +657,12 @@ final class AppState {
         currentSystemRMS = 0
         let coord = RecordingCoordinator()
         self.recorder = coord
+        videoCaptureStatus = .off
         do {
             try await coord.start(
                 captureSystemAudio: captureSystemAudio,
+                recordScreen: recordScreen,
+                meeting: meeting,
                 onMicLevel: { [weak self] rms in
                     Task { @MainActor in self?.currentMicRMS = rms }
                 },
@@ -642,6 +673,9 @@ final class AppState {
                     Task { @MainActor in
                         self?.currentInputDeviceName = AudioRecorder.currentInputDeviceName()
                     }
+                },
+                onVideoStatus: { [weak self] status in
+                    Task { @MainActor in self?.videoCaptureStatus = status }
                 }
             )
             currentInputDeviceName = AudioRecorder.currentInputDeviceName()
@@ -653,8 +687,18 @@ final class AppState {
             detectedMeeting = nil
         } catch {
             recordingState = .idle
+            videoCaptureStatus = .off
             lastError = "Could not start recording: \(error.localizedDescription)"
         }
+    }
+
+    /// Turn on screen recording while a recording is already running.
+    /// No-op when idle or when video is already being captured.
+    func startScreenCaptureNow() async {
+        guard case .recording(_, let meeting, _) = recordingState,
+              let recorder else { return }
+        if case .recording = videoCaptureStatus { return }
+        await recorder.startVideo(meeting: meeting)
     }
 
     func setMicMuted(_ muted: Bool) {
@@ -671,13 +715,16 @@ final class AppState {
         defer { self.recorder = nil }
         do {
             let stems = try await recorder.stop()
+            videoCaptureStatus = .off
             let duration = Date().timeIntervalSince(startedAt)
             let job = ProcessingJob(
                 id: UUID(),
                 title: jobTitle(for: meeting, startedAt: startedAt),
                 input: .liveStems(voiceURL: stems.voiceURL,
                                   systemURL: stems.systemURL,
-                                  duration: duration),
+                                  duration: duration,
+                                  videoURL: stems.videoURL,
+                                  videoStartOffset: stems.videoStartOffset),
                 language: language,
                 meeting: meeting,
                 sourceKind: .live,
@@ -691,6 +738,7 @@ final class AppState {
             recordingState = .idle
         } catch {
             recordingState = .idle
+            videoCaptureStatus = .off
             lastError = "Stop failed: \(error.localizedDescription)"
         }
     }
@@ -716,7 +764,9 @@ final class AppState {
     /// Enqueues an import job. Unlike recording, imports don't touch
     /// `recordingState` — they can be added to the queue while a recording is
     /// in progress or other jobs are processing.
-    func importFile(url sourceURL: URL, language: TranscriptionLanguage) async {
+    func importFile(url sourceURL: URL,
+                    language: TranscriptionLanguage,
+                    model: WhisperModel? = nil) async {
         let job = ProcessingJob(
             id: UUID(),
             title: sourceURL.lastPathComponent,
@@ -726,7 +776,7 @@ final class AppState {
             sourceKind: .imported,
             importedName: sourceURL.lastPathComponent,
             replacingDocumentID: nil,
-            modelOverride: nil,
+            modelOverride: model,
             stage: .queued,
             createdAt: Date()
         )
@@ -755,7 +805,9 @@ final class AppState {
             title: "\(doc.title) · \(model.shortName)",
             input: .liveStems(voiceURL: voiceURL,
                               systemURL: systemURL,
-                              duration: doc.duration),
+                              duration: doc.duration,
+                              videoURL: TranscriptStore.shared.videoURL(for: doc),
+                              videoStartOffset: doc.videoStartOffset),
             language: doc.language,
             meeting: nil,
             sourceKind: doc.sourceKind,
@@ -810,12 +862,18 @@ final class AppState {
         let duration: TimeInterval
         let progressOffset: Double
 
+        let videoURL: URL?
+        let videoStartOffset: TimeInterval?
+        var recordingDate: Date? = nil   // imports only; live recordings use `date`
+
         do {
             switch job.input {
-            case .liveStems(let v, let s, let d):
+            case .liveStems(let v, let s, let d, let video, let videoOffset):
                 voiceURL = v
                 systemURL = s
                 duration = d
+                videoURL = video
+                videoStartOffset = videoOffset
                 progressOffset = 0.0
             case .importFile(let src):
                 updateJobStage(jobID, .running(progress: 0.0, stage: "Decoding audio"))
@@ -826,13 +884,18 @@ final class AppState {
                     }
                 }
                 let dur = try await MediaImporter.duration(of: src)
+                recordingDate = await MediaImporter.recordingDate(of: src)
                 voiceURL = wavURL
                 systemURL = nil
                 duration = dur
+                videoURL = nil
+                videoStartOffset = nil
                 progressOffset = 0.2
             }
 
-            updateJobStage(jobID, .running(progress: progressOffset + 0.05, stage: "Loading Whisper"))
+            let model = job.modelOverride ?? selectedModel
+            updateJobStage(jobID, .running(progress: progressOffset + 0.05,
+                                           stage: model.isCloud ? "Preparing upload" : "Loading Whisper"))
             let pipeline = TranscriptionPipeline()
             let progress: (Double, String) -> Void = { [weak self] p, s in
                 Task { @MainActor in
@@ -842,7 +905,6 @@ final class AppState {
                 }
             }
             let prime = languagePrimes[language.rawValue] ?? ""
-            let model = job.modelOverride ?? selectedModel
             let freshDoc = try await pipeline.run(voiceURL: voiceURL,
                                                   systemURL: systemURL,
                                                   duration: duration,
@@ -860,19 +922,30 @@ final class AppState {
             // transcription output (new model, segments, speakers, duration).
             // The stale summary is dropped — it was built against the old
             // segments and no longer matches.
-            let docToSave: TranscriptDocument
+            var docToSave: TranscriptDocument
             if let replaceID = job.replacingDocumentID,
                let existing = transcripts.first(where: { $0.id == replaceID }) {
                 docToSave = Self.applyRetranscription(to: existing, from: freshDoc)
             } else {
                 docToSave = freshDoc
+                docToSave.recordedAt = recordingDate
+            }
+            if let videoURL {
+                docToSave.videoFileName = videoURL.lastPathComponent
+                docToSave.videoStartOffset = videoStartOffset
             }
             try TranscriptStore.shared.save(docToSave, audioSource: voiceURL)
             await loadTranscripts()
             selectedTranscriptID = docToSave.id
             processingJobs.removeAll { $0.id == jobID }
         } catch {
-            lastError = "Transcription failed: \(error.localizedDescription)"
+            // Scribe errors already carry actionable, self-contained messages;
+            // prefixing them with "Transcription failed:" reads doubly framed.
+            if error is ScribeEngine.ScribeError {
+                lastError = error.localizedDescription
+            } else {
+                lastError = "Transcription failed: \(error.localizedDescription)"
+            }
             // Drop the failed job from the queue so the drain continues.
             processingJobs.removeAll { $0.id == jobID }
         }
@@ -889,6 +962,7 @@ final class AppState {
             id: existing.id,
             title: existing.title,
             date: existing.date,
+            recordedAt: existing.recordedAt,
             duration: fresh.duration,
             language: fresh.language,
             modelShortName: fresh.modelShortName,
@@ -897,6 +971,8 @@ final class AppState {
             speakers: fresh.speakers,
             segments: fresh.segments,
             audioFileName: existing.audioFileName,
+            videoFileName: existing.videoFileName,
+            videoStartOffset: existing.videoStartOffset,
             summary: nil,
             summaryModelShortName: nil,
             summaryGeneratedAt: nil
@@ -931,6 +1007,15 @@ final class AppState {
               let idx = transcripts.firstIndex(where: { $0.id == id }) else { return }
         transcripts[idx].title = trimmed
         try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+    }
+
+    /// Manually set (or clear, with nil) the recording date for a transcript.
+    /// Re-sorts the list since `displayDate` drives ordering.
+    func setRecordedAt(_ date: Date?, for id: String) {
+        guard let idx = transcripts.firstIndex(where: { $0.id == id }) else { return }
+        transcripts[idx].recordedAt = date
+        try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+        transcripts.sort { $0.displayDate > $1.displayDate }
     }
 
     func renameSpeaker(transcriptID: String, speakerID: Int, to newName: String) {

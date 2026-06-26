@@ -146,7 +146,8 @@ final class MeetingDetector {
                 title: meetingTitle(for: url, platform: pattern.name),
                 platform: pattern.name,
                 url: url,
-                detectedAt: Date()
+                detectedAt: Date(),
+                browserBundleID: browser.bundleID
             )
             onMeetingDetected?(meeting)
             return

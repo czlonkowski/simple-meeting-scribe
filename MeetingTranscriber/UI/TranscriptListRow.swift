@@ -18,7 +18,7 @@ struct TranscriptListRow: View {
             }
 
             HStack(spacing: 6) {
-                Text(doc.date, style: .date)
+                Text(doc.displayDate, style: .date)
                 Text("·")
                 Text(formatDuration(doc.duration))
                 Text("·")

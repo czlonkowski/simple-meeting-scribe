@@ -27,7 +27,7 @@ private struct GeneralSettingsView: View {
         @Bindable var state = appState
 
         Form {
-            Section("Transcription") {
+            Section {
                 Picker("Model", selection: $state.selectedModel) {
                     ForEach(WhisperModel.allCases) { m in
                         Text(m.displayName).tag(m)
@@ -38,9 +38,28 @@ private struct GeneralSettingsView: View {
                         Text("\(l.flag) \(l.displayName)").tag(l)
                     }
                 }
+                SecureField("ElevenLabs API key", text: Binding(
+                    get: { appState.elevenLabsAPIKey },
+                    set: { appState.setElevenLabsAPIKey($0) }
+                ))
+                if state.selectedModel.isCloud && state.elevenLabsAPIKey.isEmpty {
+                    Label("Scribe v2 needs an API key", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                }
+            } header: {
+                Text("Transcription")
+            } footer: {
+                Text("The API key is stored in the macOS Keychain. Required for ElevenLabs Scribe v2 (audio is sent to ElevenLabs for transcription).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Capture") {
                 Toggle("Include Arc system audio by default", isOn: $state.captureSystemAudio)
+                Toggle("Record meeting screen by default", isOn: Binding(
+                    get: { state.recordScreen },
+                    set: { state.setRecordScreen($0) }
+                ))
             }
             Section("Storage") {
                 LabeledContent("Transcripts folder") {

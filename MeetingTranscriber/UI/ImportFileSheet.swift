@@ -1,26 +1,31 @@
 import SwiftUI
 
-struct MeetingJoinSheet: View {
-    let meeting: DetectedMeeting
+/// Shown when the user drops a media file into the window or picks one via
+/// Browse/Import. Lets them hand-pick the transcription engine and language
+/// for this file — the engine choice is local to the sheet, so it doesn't
+/// disturb the global model selection.
+struct ImportFileSheet: View {
+    let url: URL
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
+    @State private var model: WhisperModel = .largeV3Turbo
+
     var body: some View {
-        @Bindable var appState = appState
         VStack(spacing: 22) {
             VStack(spacing: 6) {
-                Image(systemName: "video.fill")
+                Image(systemName: "tray.and.arrow.down.fill")
                     .font(.system(size: 38))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.accent)
                     .padding(10)
-                    .glassEffect(.regular.tint(.red.opacity(0.15)), in: .circle)
-                Text("Meeting detected")
+                    .glassEffect(.regular.tint(Theme.accent.opacity(0.15)), in: .circle)
+                Text("Import file")
                     .font(.title2.weight(.semibold))
-                Text(meeting.title)
+                Text(url.lastPathComponent)
                     .foregroundStyle(.secondary)
-                Text(meeting.platform)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 360)
             }
             .padding(.top, 4)
 
@@ -28,7 +33,7 @@ struct MeetingJoinSheet: View {
                 Text("Transcription engine")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Picker("Model", selection: $appState.selectedModel) {
+                Picker("Model", selection: $model) {
                     ForEach(WhisperModel.allCases) { m in
                         Text(m.compactName).tag(m)
                     }
@@ -37,17 +42,8 @@ struct MeetingJoinSheet: View {
                 .labelsHidden()
             }
 
-            Toggle(isOn: Binding(
-                get: { appState.recordScreen },
-                set: { appState.setRecordScreen($0) }
-            )) {
-                Label("Record screen", systemImage: "video.fill")
-            }
-            .toggleStyle(.switch)
-            .help("Record the meeting's browser window as video")
-
             VStack(spacing: 10) {
-                Text("Record this meeting in:")
+                Text("Transcribe in:")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -59,19 +55,19 @@ struct MeetingJoinSheet: View {
                 }
             }
 
-            Button("Ignore", role: .cancel) {
-                appState.dismissDetectedMeeting()
+            Button("Cancel", role: .cancel) {
                 dismiss()
             }
             .keyboardShortcut(.escape, modifiers: [])
         }
         .padding(28)
         .frame(width: 440)
+        .onAppear { model = appState.selectedModel }
     }
 
     private func languageButton(_ language: TranscriptionLanguage) -> some View {
         Button {
-            Task { await appState.startRecording(language: language, meeting: meeting) }
+            Task { await appState.importFile(url: url, language: language, model: model) }
             dismiss()
         } label: {
             VStack(spacing: 4) {
@@ -82,7 +78,7 @@ struct MeetingJoinSheet: View {
         }
         .buttonStyle(.glassProminent)
         .controlSize(.extraLarge)
-        .tint(.red)
+        .tint(Theme.accent)
         .keyboardShortcut(language == .english ? "e" : "p", modifiers: [.command])
     }
 }

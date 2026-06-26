@@ -92,7 +92,7 @@ enum SummaryPrompts {
         switch language {
         case .english:
             return """
-                Generate a concise meeting title from the transcript below.
+                Generate a concise meeting title from the meeting summary below.
 
                 Rules:
                 • 3–8 words, Title Case.
@@ -102,7 +102,7 @@ enum SummaryPrompts {
                 """
         case .polish:
             return """
-                Wygeneruj zwięzły tytuł spotkania na podstawie poniższej transkrypcji.
+                Wygeneruj zwięzły tytuł spotkania na podstawie poniższego streszczenia.
 
                 Zasady:
                 • 3–8 słów, z wielkiej litery tam, gdzie to naturalne.
