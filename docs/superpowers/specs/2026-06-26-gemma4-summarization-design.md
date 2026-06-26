@@ -1,7 +1,19 @@
-# Replace Bielik with Gemma 4 12B as the summarization model
+# Replace Bielik with Gemma 4 as the summarization model
 
 **Date:** 2026-06-26
-**Status:** Approved — ready for implementation plan
+**Status:** Implemented — pending interactive functional run (Task 6)
+
+> **Revision (2026-06-26, during implementation):** The chosen model changed
+> from **Gemma 4 12B 8-bit** to **Gemma 4 26B-A4B 4-bit**
+> (`mlx-community/gemma-4-26b-a4b-it-4bit`). Reason: the 12B variant uses the
+> newer `gemma4_unified` architecture, which **no released or `main` version of
+> `mlx-swift-lm` registers** (the library knows `gemma4` only; the 12B was
+> released after the library's last commit). Confirmed by inspecting the
+> resolved package sources and independently by Codex. The 26B-A4B is a
+> library-blessed `gemma4`-arch MoE preset (~4B active params, ~14 GB at 4-bit,
+> multilingual) — similar footprint, runs on the pinned library via the same
+> VLM path. Everything else below stands; substitute the 26B-A4B repo ID for
+> the 12B one throughout.
 
 ## Summary
 

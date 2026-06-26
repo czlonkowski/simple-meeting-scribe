@@ -2,7 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove the three Bielik models and add Gemma 4 12B 8-bit as the unified default summarization model for both English and Polish.
+**Goal:** Remove the three Bielik models and add Gemma 4 as the unified default summarization model for both English and Polish.
+
+> **Revision (during implementation):** Final review caught that the planned
+> `mlx-community/gemma-4-12B-it-8bit` is `gemma4_unified` arch, unsupported by
+> the pinned `mlx-swift-lm` 3.31.3 (and absent from `main`). Switched to
+> `mlx-community/gemma-4-26b-a4b-it-4bit` (`gemma4` arch, supported; MoE ~4B
+> active, ~14 GB). Implemented as commit `8a1461f` on top of Task 2. The Task 2
+> code blocks below still describe the original 12B values — the shipped enum
+> uses the 26B-A4B repo ID and `gemma4-26b-a4b-4bit` short name instead.
 
 **Architecture:** `SummarizationEngine` loads one MLX `ModelContainer` and drives it with `ChatSession`. Gemma 4 is a VLM-class arch (`gemma4_unified`), so it loads through `VLMModelFactory` instead of the text-only `LLMModelFactory`; text-only generation works unchanged on the resulting container. A per-model `loadsViaVLMFactory` flag selects the factory.
 
