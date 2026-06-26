@@ -281,7 +281,7 @@ private struct SummarySettingsView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("English (Qwen3.5)").font(.subheadline).foregroundStyle(.secondary)
+                    Text("English").font(.subheadline).foregroundStyle(.secondary)
                     TextEditor(text: $englishPromptDraft)
                         .font(.body)
                         .frame(minHeight: 64)
@@ -302,7 +302,7 @@ private struct SummarySettingsView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Polish (Bielik)").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Polish").font(.subheadline).foregroundStyle(.secondary)
                     TextEditor(text: $polishPromptDraft)
                         .font(.body)
                         .frame(minHeight: 64)
