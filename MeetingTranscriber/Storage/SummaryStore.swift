@@ -20,8 +20,8 @@ enum SummaryStore {
     static func defaultModel(for language: TranscriptionLanguage) -> LanguageModel {
         // Gemma 4 is the unified multilingual default for both languages.
         switch language {
-        case .english: return .gemma4_26b_a4b_it_mlx_4bit
-        case .polish:  return .gemma4_26b_a4b_it_mlx_4bit
+        case .english: return .gemma4_e4b_it_mlx_8bit
+        case .polish:  return .gemma4_e4b_it_mlx_8bit
         }
     }
 

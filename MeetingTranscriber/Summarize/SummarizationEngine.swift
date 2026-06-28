@@ -46,10 +46,11 @@ actor SummarizationEngine {
     private func configureMemoryBudgetOnce() {
         guard !configured else { return }
         configured = true
-        // 16 GB cap on MLX allocations — Gemma 4 12B 8-bit needs ~14 GB active.
-        // On a 32 GB M-series Mac this still leaves ~16 GB for the OS, Whisper
-        // (CoreML/ANE), browser, etc. memoryLimit is a soft recycle threshold,
-        // not a hard ceiling, so brief spikes on long transcripts are tolerated.
+        // 16 GB cap on MLX allocations — generous headroom for the
+        // summarization models (largest active footprint ~7 GB). On a 32 GB
+        // M-series Mac this leaves ~16 GB for the OS, Whisper (CoreML/ANE),
+        // browser, etc. memoryLimit is a soft recycle threshold, not a hard
+        // ceiling, so brief spikes on long transcripts are tolerated.
         let memLimitBytes = 16 * 1024 * 1024 * 1024
         MLX.GPU.set(memoryLimit: memLimitBytes)
         // Keep the allocator cache tiny so memory is returned promptly.
