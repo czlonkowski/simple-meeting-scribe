@@ -52,9 +52,9 @@ actor SummarizationEngine {
         // browser, etc. memoryLimit is a soft recycle threshold, not a hard
         // ceiling, so brief spikes on long transcripts are tolerated.
         let memLimitBytes = 16 * 1024 * 1024 * 1024
-        MLX.GPU.set(memoryLimit: memLimitBytes)
+        MLX.Memory.memoryLimit = memLimitBytes
         // Keep the allocator cache tiny so memory is returned promptly.
-        MLX.GPU.set(cacheLimit: 256 * 1024 * 1024)   // 256 MB
+        MLX.Memory.cacheLimit = 256 * 1024 * 1024   // 256 MB
         Log.summary.notice("memory budget: limit=\(memLimitBytes, privacy: .public) cache=256MB")
     }
 

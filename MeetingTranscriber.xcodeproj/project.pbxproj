@@ -617,7 +617,7 @@
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 3.31.3;
+				minimumVersion = 3.31.4;
 			};
 		};
 		6528DB1206624F6040F060E8 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
