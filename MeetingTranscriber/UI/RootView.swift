@@ -195,7 +195,7 @@ struct RootView: View {
                         Button {
                             showShortRecordings.toggle()
                         } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: Theme.space3) {
                                 Image(systemName: showShortRecordings
                                       ? "eye.slash"
                                       : "eye")
@@ -206,7 +206,7 @@ struct RootView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.pressable)
                     }
                 }
             }
@@ -238,12 +238,13 @@ struct RootView: View {
                     Button {
                         toggleTagFilter(tag.name)
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: Theme.space4) {
                             Image(systemName: "checkmark")
                                 .opacity(activeTagFilters.contains(key) ? 1 : 0)
                             Circle()
                                 .fill(tag.color.swiftUIColor)
                                 .frame(width: 8, height: 8)
+                                .chipHover()
                             Text(tag.name)
                         }
                     }

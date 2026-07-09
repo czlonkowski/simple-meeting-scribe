@@ -231,6 +231,7 @@ struct AudioPlayerCard: View {
 /// moves the attached video follower too.
 struct PlayerTransportRow: View {
     @Bindable var player: TranscriptAudioPlayer
+    @ScaledMetric private var playPauseGlyphSize: CGFloat = 34
 
     var body: some View {
         HStack(spacing: 14) {
@@ -238,15 +239,15 @@ struct PlayerTransportRow: View {
                 player.togglePlay()
             } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 34, weight: .regular))
+                    .font(.system(size: playPauseGlyphSize, weight: .regular))
                     .foregroundStyle(Theme.accent)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressable)
             .keyboardShortcut(.space, modifiers: [])
             .help(player.isPlaying ? "Pause" : "Play")
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.space2) {
                 Slider(
                     value: Binding(
                         get: { player.currentTime },

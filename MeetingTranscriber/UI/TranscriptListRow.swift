@@ -5,7 +5,7 @@ struct TranscriptListRow: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.space2) {
             Text(doc.title)
                 .font(.headline)
                 .lineLimit(1)
@@ -18,7 +18,7 @@ struct TranscriptListRow: View {
                     .multilineTextAlignment(.leading)
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space3) {
                 Text(doc.displayDate, style: .date)
                 Text("·")
                 Text(formatDuration(doc.duration))
@@ -71,7 +71,7 @@ private struct CompactTagChip: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.space2) {
             Circle()
                 .fill(color)
                 .frame(width: 5, height: 5)
@@ -80,12 +80,13 @@ private struct CompactTagChip: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: 72, alignment: .leading)
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, Theme.space3)
         .padding(.vertical, 2)
         .background(color.opacity(0.12), in: Capsule())
         .overlay {
             Capsule()
                 .stroke(color.opacity(0.28), lineWidth: 0.5)
         }
+        .chipHover()
     }
 }

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct TranscriptDetailView: View {
     let documentID: String
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var renamingSpeakerID: Int? = nil
     @State private var newSpeakerNameDraft: String = ""
@@ -28,6 +29,22 @@ struct TranscriptDetailView: View {
 
     private var document: TranscriptDocument? {
         appState.transcripts.first(where: { $0.id == documentID })
+    }
+
+    private var entranceAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.16) : .snappy(duration: 0.22)
+    }
+
+    private var summaryCardTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .scale(scale: 0.97).combined(with: .opacity)
+    }
+
+    private var bottomRevealTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .move(edge: .bottom))
     }
 
     var body: some View {
@@ -86,7 +103,7 @@ struct TranscriptDetailView: View {
                 exportButton(for: doc)
                 copyButton(for: doc)
             }
-            .padding(24)
+            .padding(Theme.space12)
         }
     }
 
@@ -96,7 +113,7 @@ struct TranscriptDetailView: View {
         HStack(alignment: .top) {
             headerTextBlock(for: doc)
             Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: Theme.space3) {
                 summarizeButton(for: doc)
                 retranscribeButton(for: doc)
             }
@@ -105,22 +122,23 @@ struct TranscriptDetailView: View {
 
     @ViewBuilder
     private func headerTextBlock(for doc: TranscriptDocument) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space3) {
             TextField("Title", text: $titleDraft)
                 .font(Theme.titleFont)
+                .tracking(-0.4)
                 .textFieldStyle(.plain)
                 .onSubmit {
                     appState.renameTranscript(id: documentID, to: titleDraft)
                 }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space4) {
                 Button {
                     recordedDraft = doc.displayDate
                     showDateEditor = true
                 } label: {
                     Label(dateLabelText(for: doc), systemImage: "calendar")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressable)
                 .help(doc.recordedAt != nil
                       ? "Recorded \(doc.displayDate.formatted(date: .abbreviated, time: .omitted)) · transcribed \(doc.date.formatted(date: .abbreviated, time: .shortened)). Click to edit."
                       : "Transcribed \(doc.date.formatted(date: .abbreviated, time: .shortened)). Click to set the recording date.")
@@ -160,7 +178,7 @@ struct TranscriptDetailView: View {
 
     @ViewBuilder
     private func dateEditorPopover(for doc: TranscriptDocument) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Theme.space6) {
             Text("Recording date")
                 .font(.headline)
             DatePicker("", selection: $recordedDraft, displayedComponents: .date)
@@ -189,7 +207,7 @@ struct TranscriptDetailView: View {
     @ViewBuilder
     private func speakersBlock(for doc: TranscriptDocument) -> some View {
         if !doc.speakers.isEmpty {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space4) {
                 ForEach(doc.speakers) { sp in
                     speakerChip(sp)
                 }
@@ -203,17 +221,18 @@ struct TranscriptDetailView: View {
             renamingSpeakerID = sp.id
             newSpeakerNameDraft = sp.name
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space3) {
                 Circle()
                     .fill(speakerTint(for: sp.id))
                     .frame(width: 8, height: 8)
                 Text(sp.name)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Theme.space6)
             .padding(.vertical, 5)
         }
         .buttonStyle(.glass)
         .controlSize(.small)
+        .chipHover()
         .popover(isPresented: Binding(
             get: { renamingSpeakerID == sp.id },
             set: { if !$0, renamingSpeakerID == sp.id { renamingSpeakerID = nil } }
@@ -236,7 +255,7 @@ struct TranscriptDetailView: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(12)
+        .padding(Theme.space6)
     }
 
     private func commitSpeakerRename(id: Int) {
@@ -249,7 +268,7 @@ struct TranscriptDetailView: View {
     // MARK: – Tags
     @ViewBuilder
     private func tagsBlock(for doc: TranscriptDocument) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.space4) {
             ForEach(doc.tags, id: \.self) { tagName in
                 assignedTagChip(tagName)
             }
@@ -261,11 +280,12 @@ struct TranscriptDetailView: View {
                 Image(systemName: "plus")
                     .font(.caption.weight(.semibold))
                     .frame(width: 14, height: 14)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, Theme.space3)
                     .padding(.vertical, 5)
             }
             .buttonStyle(.glass)
             .controlSize(.small)
+            .chipHover()
             .help("Add tag")
             .popover(isPresented: $showingAddTagPopover, arrowEdge: .bottom) {
                 addTagPopover()
@@ -279,7 +299,7 @@ struct TranscriptDetailView: View {
         Button {
             removeTag(tagName)
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space3) {
                 Circle()
                     .fill(appState.color(for: tagName).swiftUIColor)
                     .frame(width: 8, height: 8)
@@ -288,11 +308,12 @@ struct TranscriptDetailView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Theme.space6)
             .padding(.vertical, 5)
         }
         .buttonStyle(.glass)
         .controlSize(.small)
+        .chipHover()
         .help("Remove \(tagName)")
     }
 
@@ -310,12 +331,12 @@ struct TranscriptDetailView: View {
 
             if !suggestions.isEmpty {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.space2) {
                         ForEach(suggestions) { tag in
                             Button {
                                 addTag(tag.name)
                             } label: {
-                                HStack(spacing: 8) {
+                                HStack(spacing: Theme.space4) {
                                     Circle()
                                         .fill(tag.color.swiftUIColor)
                                         .frame(width: 8, height: 8)
@@ -324,7 +345,7 @@ struct TranscriptDetailView: View {
                                 }
                                 .contentShape(.rect)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.pressable)
                             .padding(.vertical, 3)
                         }
                     }
@@ -336,7 +357,7 @@ struct TranscriptDetailView: View {
                 Button {
                     commitTagDraft()
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space4) {
                         Circle()
                             .fill(nextAutoTagColor.swiftUIColor)
                             .frame(width: 8, height: 8)
@@ -345,7 +366,7 @@ struct TranscriptDetailView: View {
                     }
                     .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.pressable)
             }
 
             HStack {
@@ -357,7 +378,7 @@ struct TranscriptDetailView: View {
                 .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(12)
+        .padding(Theme.space6)
     }
 
     private var trimmedTagDraft: String {
@@ -418,6 +439,13 @@ struct TranscriptDetailView: View {
         appState.summarizingTranscriptID == documentID && appState.summarizationStage.isActive
     }
 
+    private var currentSummaryErrorMessage: String? {
+        guard case .error(let msg) = appState.summarizationStage,
+              appState.summarizingTranscriptID == documentID
+        else { return nil }
+        return msg
+    }
+
     @ViewBuilder
     private func summarizeButton(for doc: TranscriptDocument) -> some View {
         let hasSummary = (doc.summary?.isEmpty == false)
@@ -430,8 +458,8 @@ struct TranscriptDetailView: View {
             .buttonStyle(.glass)
             .controlSize(.large)
         } else {
-            VStack(alignment: .trailing, spacing: 6) {
-                HStack(spacing: 8) {
+            VStack(alignment: .trailing, spacing: Theme.space3) {
+                HStack(spacing: Theme.space4) {
                     Button {
                         appState.summarize(transcriptID: documentID,
                                            useGlossary: useGlossaryThisRun,
@@ -520,6 +548,7 @@ struct TranscriptDetailView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .chipHover()
         .help("Choose the LLM used for the summary and title. Defaults to the Settings model for this language.")
     }
 
@@ -578,8 +607,9 @@ struct TranscriptDetailView: View {
                 .font(.caption)
                 .foregroundStyle(isOn ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
         .fixedSize()
+        .chipHover()
         .help(help)
     }
 
@@ -608,7 +638,7 @@ struct TranscriptDetailView: View {
     @ViewBuilder
     private func retranscribeButton(for doc: TranscriptDocument) -> some View {
         if let job = activeRetranscribeJob {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.space3) {
                 ProgressView().controlSize(.small)
                 Text(retranscribeProgressLabel(for: job))
                     .font(.caption)
@@ -653,7 +683,7 @@ struct TranscriptDetailView: View {
                 .font(.body)
                 .frame(width: 420, height: 140)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: Theme.radiusSmall)
                         .stroke(Color.primary.opacity(0.15))
                 )
 
@@ -687,20 +717,27 @@ struct TranscriptDetailView: View {
 
     @ViewBuilder
     private func summaryBlock(for doc: TranscriptDocument) -> some View {
-        if isSummarizingThis {
-            liveStreamingBlock()
-        } else if doc.summary?.isEmpty == false {
-            savedSummaryBlock(for: doc)
-        } else if case .error(let msg) = appState.summarizationStage,
-                  appState.summarizingTranscriptID == documentID {
-            summaryErrorBlock(msg)
+        let summaryErrorMessage = currentSummaryErrorMessage
+
+        Group {
+            if isSummarizingThis {
+                liveStreamingBlock()
+                    .transition(summaryCardTransition)
+            } else if doc.summary?.isEmpty == false {
+                savedSummaryBlock(for: doc)
+            } else if let msg = summaryErrorMessage {
+                summaryErrorBlock(msg)
+                    .transition(summaryCardTransition)
+            }
         }
+        .animation(entranceAnimation, value: isSummarizingThis)
+        .animation(entranceAnimation, value: summaryErrorMessage != nil)
     }
 
     @ViewBuilder
     private func liveStreamingBlock() -> some View {
         GlassCard(padding: 18) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
                 switch appState.summarizationStage {
                 case .loadingModel(let fraction):
                     Label("Loading model…", systemImage: "arrow.down.circle")
@@ -711,22 +748,22 @@ struct TranscriptDetailView: View {
                 case .identifyingSpeakers:
                     Label("Identifying speakers…", systemImage: "person.text.rectangle")
                         .font(.headline)
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space4) {
                         ProgressView().controlSize(.small)
                         Text("Reading transcript…").foregroundStyle(.secondary)
                     }
 
                 case .generatingSummary(let text):
                     Label("Summary", systemImage: "sparkles")
-                        .font(.headline)
+                        .font(Theme.sectionTitleFont)
                     streamingText(text, placeholder: "Generating…")
 
                 case .generatingTitle(let summary):
                     Label("Summary", systemImage: "sparkles")
-                        .font(.headline)
+                        .font(Theme.sectionTitleFont)
                     Text(markdown: summary).textSelection(.enabled)
                     Divider()
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space4) {
                         ProgressView().controlSize(.small)
                         Text("Titling…").foregroundStyle(.secondary)
                     }
@@ -741,7 +778,7 @@ struct TranscriptDetailView: View {
     @ViewBuilder
     private func streamingText(_ text: String, placeholder: String) -> some View {
         if text.isEmpty {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.space4) {
                 ProgressView().controlSize(.small)
                 Text(placeholder).foregroundStyle(.secondary)
             }
@@ -753,11 +790,11 @@ struct TranscriptDetailView: View {
     @ViewBuilder
     private func savedSummaryBlock(for doc: TranscriptDocument) -> some View {
         GlassCard(padding: 18) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
                 HStack {
                     if doc.summary?.isEmpty == false {
                         Label("Summary", systemImage: "sparkles")
-                            .font(.headline)
+                            .font(Theme.sectionTitleFont)
                     }
                     Spacer()
                     Button {
@@ -799,11 +836,11 @@ struct TranscriptDetailView: View {
 
     @ViewBuilder
     private func summaryErrorBlock(_ msg: String) -> some View {
-        GlassCard(padding: 16) {
+        GlassCard(padding: Theme.space8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.space2) {
                     Text("Summarization failed").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                 }
@@ -815,9 +852,11 @@ struct TranscriptDetailView: View {
     // MARK: – Transcript
     @ViewBuilder
     private func transcriptBlock(for doc: TranscriptDocument) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.space4) {
             Button {
-                transcriptExpanded.toggle()
+                withAnimation(entranceAnimation) {
+                    transcriptExpanded.toggle()
+                }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
@@ -826,7 +865,7 @@ struct TranscriptDetailView: View {
                         .frame(width: 14)
                         .rotationEffect(.degrees(transcriptExpanded ? 90 : 0))
                         .animation(.snappy(duration: 0.18), value: transcriptExpanded)
-                    Text("Transcript").font(.headline)
+                    Text("Transcript").font(Theme.sectionTitleFont)
                     Text("·").foregroundStyle(.tertiary)
                     Text("\(doc.segments.count) segment\(doc.segments.count == 1 ? "" : "s")")
                         .font(.subheadline)
@@ -839,12 +878,13 @@ struct TranscriptDetailView: View {
                 .padding(.vertical, 10)
                 .contentShape(.rect)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.pressable)
             .accessibilityLabel(transcriptExpanded ? "Hide transcript" : "Show transcript")
             .accessibilityAddTraits(.isHeader)
 
             if transcriptExpanded {
                 transcriptSegments(for: doc)
+                    .transition(bottomRevealTransition)
             }
         }
     }
@@ -864,11 +904,11 @@ struct TranscriptDetailView: View {
                             .font(Theme.monoFont)
                             .monospacedDigit()
                             .foregroundStyle(audioPlayer.url != nil
-                                             ? AnyShapeStyle(Color.accentColor)
+                                             ? AnyShapeStyle(Theme.accent)
                                              : AnyShapeStyle(.tertiary))
                             .frame(width: 72, alignment: .leading)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.pressable)
                     .disabled(audioPlayer.url == nil)
                     .help(audioPlayer.url != nil ? "Play from here" : "")
 
@@ -891,11 +931,11 @@ struct TranscriptDetailView: View {
         } label: {
             Label(justCopied ? "Copied!" : "Copy as Markdown",
                   systemImage: justCopied ? "checkmark.circle.fill" : "doc.on.doc.fill")
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space4)
         }
         .buttonStyle(.glassProminent)
         .controlSize(.large)
-        .tint(justCopied ? .green : .accentColor)
+        .tint(justCopied ? .green : Theme.accent)
         .sensoryFeedback(.success, trigger: justCopied) { _, new in new }
         .keyboardShortcut("c", modifiers: [.command, .shift])
     }
@@ -918,11 +958,11 @@ struct TranscriptDetailView: View {
             exportMarkdown(doc)
         } label: {
             Label("Save as .md…", systemImage: "square.and.arrow.down.fill")
-                .padding(.horizontal, 8)
+                .padding(.horizontal, Theme.space4)
         }
         .buttonStyle(.glassProminent)
         .controlSize(.large)
-        .tint(.accentColor)
+        .tint(Theme.accent)
         .keyboardShortcut("e", modifiers: [.command, .shift])
     }
 
@@ -956,9 +996,8 @@ struct TranscriptDetailView: View {
     }
 
     private func speakerTint(for id: Int) -> Color {
-        let palette: [Color] = [.blue, .orange, .purple, .green, .pink, .teal]
         if id < 0 { return .gray }
-        return palette[id % palette.count]
+        return Theme.speakerColor(for: id)
     }
 
     private func formatTimestamp(_ s: Double) -> String {

@@ -2,18 +2,25 @@ import SwiftUI
 
 struct RecordView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric private var idleGlyphSize: CGFloat = 46
+    @State private var pulsing = false
 
     var body: some View {
         @Bindable var state = appState
 
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: Theme.space12) {
                 header
                 stateCard
                 controls
-                if appState.isProcessing {
-                    processingPanel
+                Group {
+                    if appState.isProcessing {
+                        processingPanel
+                            .transition(processingPanelTransition)
+                    }
                 }
+                .animation(processingPanelAnimation, value: appState.isProcessing)
                 Spacer(minLength: 0)
             }
             .padding(28)
@@ -28,6 +35,7 @@ struct RecordView: View {
         return HStack(alignment: .firstTextBaseline) {
             Text("Record")
                 .font(Theme.titleFont)
+                .tracking(-0.5)
             Spacer()
             Picker("Model", selection: $state.selectedModel) {
                 ForEach(WhisperModel.allCases) { m in
@@ -50,7 +58,7 @@ struct RecordView: View {
                 case .recording(_, let meeting, let lang):
                     recordingCenter(meeting: meeting, language: lang)
                 case .stopping:
-                    HStack(spacing: 12) {
+                    HStack(spacing: Theme.space6) {
                         ProgressView().controlSize(.small)
                         Text("Stopping…").foregroundStyle(.secondary)
                     }
@@ -64,7 +72,7 @@ struct RecordView: View {
     private var idleCenter: some View {
         VStack(spacing: 14) {
             Image(systemName: "waveform.badge.microphone")
-                .font(.system(size: 46, weight: .light))
+                .font(.system(size: idleGlyphSize, weight: .light))
                 .foregroundStyle(.secondary)
             Text("Ready")
                 .font(.title2.weight(.medium))
@@ -84,7 +92,7 @@ struct RecordView: View {
     }
 
     private var preparingCenter: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.space6) {
             ProgressView().controlSize(.small)
             Text("Preparing…").foregroundStyle(.secondary)
         }
@@ -97,8 +105,13 @@ struct RecordView: View {
                 Circle()
                     .fill(Theme.accent)
                     .frame(width: 10, height: 10)
-                    .opacity(appState.elapsedSeconds.isMultiple(of: 2) ? 1 : 0.35)
-                    .animation(.easeInOut(duration: 0.6), value: appState.elapsedSeconds)
+                    .opacity(reduceMotion ? 1 : (pulsing ? 0.35 : 1))
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                        value: pulsing
+                    )
+                    .onAppear { pulsing = true }
+                    .onDisappear { pulsing = false }
                 Text(elapsedString)
                     .font(Theme.monoFont.weight(.medium))
                     .monospacedDigit()
@@ -155,18 +168,18 @@ struct RecordView: View {
     @ViewBuilder
     private var processingPanel: some View {
         GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.space6) {
+                HStack(spacing: Theme.space4) {
                     Image(systemName: "waveform.path")
                         .foregroundStyle(.secondary)
                     Text("Transcribing in background")
-                        .font(.headline)
+                        .font(Theme.sectionTitleFont)
                     Spacer()
                     if appState.queuedJobCount > 0 {
                         Text("+\(appState.queuedJobCount) queued")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, Theme.space4)
                             .padding(.vertical, 3)
                             .background(Capsule().fill(Color.secondary.opacity(0.15)))
                     }
@@ -174,7 +187,7 @@ struct RecordView: View {
 
                 if let job = appState.activeJob,
                    case .running(let progress, let stage) = job.stage {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: Theme.space3) {
                         HStack {
                             Text(job.title)
                                 .font(.subheadline.weight(.medium))
@@ -188,7 +201,7 @@ struct RecordView: View {
                             .progressViewStyle(.linear)
                     }
                 } else {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space4) {
                         ProgressView().controlSize(.small)
                         Text("Queued…").font(.subheadline).foregroundStyle(.secondary)
                     }
@@ -198,12 +211,20 @@ struct RecordView: View {
         }
     }
 
+    private var processingPanelTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom))
+    }
+
+    private var processingPanelAnimation: Animation? {
+        reduceMotion ? .easeOut(duration: 0.18) : .snappy
+    }
+
     // MARK: – Controls
     @ViewBuilder
     private var controls: some View {
         @Bindable var state = appState
 
-        HStack(spacing: 16) {
+        HStack(spacing: Theme.space8) {
             switch appState.recordingState {
             case .idle:
                 Picker("Language", selection: $state.defaultLanguage) {
@@ -232,7 +253,7 @@ struct RecordView: View {
                     Task { await appState.startRecording(language: appState.defaultLanguage, meeting: nil) }
                 } label: {
                     Label("Start Recording", systemImage: "record.circle.fill")
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, Theme.space3)
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)
@@ -270,7 +291,7 @@ struct RecordView: View {
                     Task { await appState.stopRecording() }
                 } label: {
                     Label("Stop", systemImage: "stop.circle.fill")
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, Theme.space3)
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)

@@ -10,12 +10,12 @@ struct VideoPlayerCard: View {
 
     var body: some View {
         GlassCard(padding: 14) {
-            VStack(spacing: 12) {
+            VStack(spacing: Theme.space6) {
                 if let avPlayer = player.videoPlayer {
                     VideoSurface(player: avPlayer)
                         .frame(maxWidth: .infinity)
                         .frame(height: 340)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMedium, style: .continuous))
                 }
                 PlayerTransportRow(player: player)
             }

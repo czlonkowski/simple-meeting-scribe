@@ -10,26 +10,29 @@ struct ImportFileSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var model: WhisperModel = .largeV3Turbo
+    @ScaledMetric private var sheetIconSize: CGFloat = 38
+    @ScaledMetric private var languageFlagSize: CGFloat = 28
 
     var body: some View {
         VStack(spacing: 22) {
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.space3) {
                 Image(systemName: "tray.and.arrow.down.fill")
-                    .font(.system(size: 38))
+                    .font(.system(size: sheetIconSize))
                     .foregroundStyle(Theme.accent)
                     .padding(10)
                     .glassEffect(.regular.tint(Theme.accent.opacity(0.15)), in: .circle)
                 Text("Import file")
                     .font(.title2.weight(.semibold))
+                    .tracking(-0.4)
                 Text(url.lastPathComponent)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: 360)
             }
-            .padding(.top, 4)
+            .padding(.top, Theme.space2)
 
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.space3) {
                 Text("Transcription engine")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -47,8 +50,8 @@ struct ImportFileSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
+                GlassEffectContainer(spacing: Theme.space6) {
+                    HStack(spacing: Theme.space6) {
                         languageButton(.english)
                         languageButton(.polish)
                     }
@@ -59,6 +62,7 @@ struct ImportFileSheet: View {
                 dismiss()
             }
             .keyboardShortcut(.escape, modifiers: [])
+            .buttonStyle(.pressable)
         }
         .padding(28)
         .frame(width: 440)
@@ -70,8 +74,8 @@ struct ImportFileSheet: View {
             Task { await appState.importFile(url: url, language: language, model: model) }
             dismiss()
         } label: {
-            VStack(spacing: 4) {
-                Text(language.flag).font(.system(size: 28))
+            VStack(spacing: Theme.space2) {
+                Text(language.flag).font(.system(size: languageFlagSize))
                 Text(language.displayName).font(.headline)
             }
             .frame(maxWidth: .infinity, minHeight: 60)

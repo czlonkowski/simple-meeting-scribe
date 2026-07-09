@@ -52,25 +52,32 @@ private struct GeneralSettingsView: View {
                 }
             } header: {
                 Text("Transcription")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("The API key is stored in the macOS Keychain. Required for ElevenLabs Scribe v2 (audio is sent to ElevenLabs for transcription).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Capture") {
+            Section {
                 Toggle("Include Arc system audio by default", isOn: $state.captureSystemAudio)
                 Toggle("Record meeting screen by default", isOn: Binding(
                     get: { state.recordScreen },
                     set: { state.setRecordScreen($0) }
                 ))
+            } header: {
+                Text("Capture")
+                    .font(Theme.sectionTitleFont)
             }
-            Section("Storage") {
+            Section {
                 LabeledContent("Transcripts folder") {
                     Button(TranscriptStore.shared.rootURL.path(percentEncoded: false)) {
                         NSWorkspace.shared.open(TranscriptStore.shared.rootURL)
                     }
                     .buttonStyle(.link)
                 }
+            } header: {
+                Text("Storage")
+                    .font(Theme.sectionTitleFont)
             }
         }
         .formStyle(.grouped)
@@ -104,9 +111,9 @@ private struct DictionarySettingsView: View {
                 TextEditor(text: $primeDraft)
                     .font(.body)
                     .frame(minHeight: 80)
-                    .padding(6)
+                    .padding(Theme.space3)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: Theme.radiusSmall)
                             .stroke(Color.primary.opacity(0.15))
                     )
 
@@ -121,16 +128,19 @@ private struct DictionarySettingsView: View {
                         flashSaved()
                     }
                     .controlSize(.small)
+                    .buttonStyle(.pressable)
                     Button(primeSavedHint ? "Saved ✓" : "Save prime") {
                         appState.setPrime(primeDraft, for: language)
                         flashSaved()
                     }
                     .controlSize(.small)
+                    .buttonStyle(.pressable)
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(primeDraft == appState.languagePrimes[language.rawValue])
                 }
             } header: {
                 Text("Prime")
+                    .font(Theme.sectionTitleFont)
             }
 
             Section {
@@ -157,7 +167,7 @@ private struct DictionarySettingsView: View {
                 }
                 .frame(minHeight: 140)
 
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space4) {
                     TextField("Original, variants", text: $newOriginal)
                         .textFieldStyle(.roundedBorder)
                     Image(systemName: "arrow.right")
@@ -168,6 +178,7 @@ private struct DictionarySettingsView: View {
                         addReplacement()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.pressable)
                     .disabled(newOriginal.trimmingCharacters(in: .whitespaces).isEmpty ||
                               newReplacement.trimmingCharacters(in: .whitespaces).isEmpty)
                     Button(role: .destructive) {
@@ -176,10 +187,12 @@ private struct DictionarySettingsView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
+                    .buttonStyle(.pressable)
                     .disabled(selectedReplacementIDs.isEmpty)
                 }
             } header: {
                 Text("Replacements")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("Applied case-insensitively after transcription with word-boundary matching. Comma-separate variants that should all map to the same replacement.")
                     .font(.caption)
@@ -240,10 +253,11 @@ private struct TagsSettingsView: View {
                 }
             } header: {
                 Text("Catalog")
+                    .font(Theme.sectionTitleFont)
             }
 
             Section {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space4) {
                     TextField("New tag", text: $newTagName)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(addTag)
@@ -254,10 +268,12 @@ private struct TagsSettingsView: View {
                         addTag()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.pressable)
                     .disabled(!canAddTag)
                 }
             } header: {
                 Text("Add tag")
+                    .font(Theme.sectionTitleFont)
             }
         }
         .formStyle(.grouped)
@@ -305,6 +321,7 @@ private struct TagSettingsRow: View {
                 commitRename()
             }
             .controlSize(.small)
+            .buttonStyle(.pressable)
             .disabled(!canRename)
 
             Spacer()
@@ -319,6 +336,7 @@ private struct TagSettingsRow: View {
                 Image(systemName: "trash")
             }
             .controlSize(.small)
+            .buttonStyle(.pressable)
             .help("Delete tag and remove it from transcripts")
         }
         .onChange(of: tag.name) { _, newName in
@@ -351,7 +369,7 @@ private struct TagColorMenu: View {
                 Button {
                     onSelect(option)
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.space4) {
                         Image(systemName: "checkmark")
                             .opacity(option == color ? 1 : 0)
                         Circle()
@@ -400,6 +418,7 @@ private struct SummarySettingsView: View {
                 .textFieldStyle(.roundedBorder)
             } header: {
                 Text("Your name")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("Used to deterministically replace the placeholder \"You\" speaker in transcripts when you summarize. Leave empty to keep \"You\" as-is.")
                     .font(.caption)
@@ -425,6 +444,7 @@ private struct SummarySettingsView: View {
                 }
             } header: {
                 Text("Default model per language")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("The matching model is used automatically based on the transcript's language.")
                     .font(.caption)
@@ -437,6 +457,7 @@ private struct SummarySettingsView: View {
                 }
             } header: {
                 Text("Model library")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("Pre-download models so the first summary is instant. Files live under ~/Documents/huggingface/models/.")
                     .font(.caption)
@@ -444,12 +465,12 @@ private struct SummarySettingsView: View {
             }
 
             Section {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Theme.space3) {
                     Text("English").font(.subheadline).foregroundStyle(.secondary)
                     TextEditor(text: $englishPromptDraft)
                         .font(.body)
                         .frame(minHeight: 64)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).stroke(Color.primary.opacity(0.15)))
                     HStack {
                         Spacer()
                         Button("Reset") {
@@ -457,20 +478,22 @@ private struct SummarySettingsView: View {
                             appState.setSystemPrompt(englishPromptDraft, for: .english)
                         }
                         .controlSize(.small)
+                        .buttonStyle(.pressable)
                         Button(englishPromptSaved ? "Saved ✓" : "Save") {
                             appState.setSystemPrompt(englishPromptDraft, for: .english)
                             flash(\.englishPromptSaved)
                         }
                         .controlSize(.small)
+                        .buttonStyle(.pressable)
                         .disabled(englishPromptDraft == appState.systemPromptEnglish)
                     }
                 }
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Theme.space3) {
                     Text("Polish").font(.subheadline).foregroundStyle(.secondary)
                     TextEditor(text: $polishPromptDraft)
                         .font(.body)
                         .frame(minHeight: 64)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.radiusSmall).stroke(Color.primary.opacity(0.15)))
                     HStack {
                         Spacer()
                         Button("Reset") {
@@ -478,16 +501,19 @@ private struct SummarySettingsView: View {
                             appState.setSystemPrompt(polishPromptDraft, for: .polish)
                         }
                         .controlSize(.small)
+                        .buttonStyle(.pressable)
                         Button(polishPromptSaved ? "Saved ✓" : "Save") {
                             appState.setSystemPrompt(polishPromptDraft, for: .polish)
                             flash(\.polishPromptSaved)
                         }
                         .controlSize(.small)
+                        .buttonStyle(.pressable)
                         .disabled(polishPromptDraft == appState.systemPromptPolish)
                     }
                 }
             } header: {
                 Text("System prompts")
+                    .font(Theme.sectionTitleFont)
             }
 
             Section {
@@ -514,7 +540,7 @@ private struct SummarySettingsView: View {
                 }
                 .frame(minHeight: 140)
 
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.space4) {
                     TextField("Term", text: $newGlossaryTerm)
                         .textFieldStyle(.roundedBorder)
                     Image(systemName: "arrow.right")
@@ -525,6 +551,7 @@ private struct SummarySettingsView: View {
                         addGlossaryEntry()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.pressable)
                     .disabled(newGlossaryTerm.trimmingCharacters(in: .whitespaces).isEmpty ||
                               newGlossaryDefinition.trimmingCharacters(in: .whitespaces).isEmpty)
                     Button(role: .destructive) {
@@ -533,21 +560,27 @@ private struct SummarySettingsView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
+                    .buttonStyle(.pressable)
                     .disabled(selectedGlossaryIDs.isEmpty)
                 }
             } header: {
                 Text("Glossary")
+                    .font(Theme.sectionTitleFont)
             } footer: {
                 Text("Domain terms with short definitions. When the per-summary toggle is on, enabled entries are injected into the LLM's system prompt so it interprets proper nouns and jargon correctly.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Runtime") {
+            Section {
                 Button("Unload current model") {
                     Task { await appState.unloadSummaryModel() }
                 }
+                .buttonStyle(.pressable)
                 .help("Free the memory used by the currently resident summarization model.")
+            } header: {
+                Text("Runtime")
+                    .font(Theme.sectionTitleFont)
             }
         }
         .formStyle(.grouped)
@@ -592,7 +625,7 @@ private struct ModelLibraryRow: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: Theme.space6) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.displayName).font(.headline)
                 Text(model.repoID)
@@ -613,9 +646,10 @@ private struct ModelLibraryRow: View {
                     Label("Download", systemImage: "arrow.down.circle")
                 }
                 .controlSize(.small)
+                .buttonStyle(.pressable)
 
             case .downloading(let fraction):
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: Theme.space2) {
                     ProgressView(value: fraction).frame(width: 120)
                     Text("\(Int(fraction * 100))%")
                         .font(.caption2.monospaced())
@@ -627,6 +661,7 @@ private struct ModelLibraryRow: View {
                     Image(systemName: "xmark.circle")
                 }
                 .controlSize(.small)
+                .buttonStyle(.pressable)
 
             case .downloaded:
                 Label("Downloaded", systemImage: "checkmark.circle.fill")
@@ -639,8 +674,9 @@ private struct ModelLibraryRow: View {
                     Image(systemName: "trash")
                 }
                 .controlSize(.small)
+                .buttonStyle(.pressable)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.space2)
     }
 }
