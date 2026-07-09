@@ -6,6 +6,9 @@ enum TranscriptFormatter {
         let isoDate = ISO8601DateFormatter().string(from: doc.date)
         let recordedFront = doc.recordedAt
             .map { "recorded: \(ISO8601DateFormatter().string(from: $0))\n" } ?? ""
+        let tagsFront = doc.tags.isEmpty
+            ? ""
+            : "tags: [\(doc.tags.map { "\"\(escape($0))\"" }.joined(separator: ", "))]\n"
         var speakersYaml = ""
         for s in doc.speakers {
             speakersYaml += "  - { id: \(s.id), name: \"\(escape(s.name))\" }\n"
@@ -20,6 +23,7 @@ enum TranscriptFormatter {
         language: \(doc.language.rawValue)
         model: \(doc.modelShortName)
         source_kind: \(doc.sourceKind.rawValue)
+        \(tagsFront)\
         \(doc.sourceURL.map { "source: \"\(escape($0))\"\n" } ?? "")speakers:
         \(speakersYaml)---
 

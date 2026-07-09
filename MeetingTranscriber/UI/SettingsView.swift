@@ -9,6 +9,9 @@ struct SettingsView: View {
             Tab("Dictionary", systemImage: "character.book.closed") {
                 DictionarySettingsView()
             }
+            Tab("Tags", systemImage: "tag") {
+                TagsSettingsView()
+            }
             Tab("Summary", systemImage: "sparkles") {
                 SummarySettingsView()
             }
@@ -209,6 +212,167 @@ private struct DictionarySettingsView: View {
             try? await Task.sleep(for: .milliseconds(1200))
             primeSavedHint = false
         }
+    }
+}
+
+// MARK: – Tags
+
+private struct TagsSettingsView: View {
+    @Environment(AppState.self) private var appState
+    @State private var newTagName: String = ""
+    @State private var newTagColor: TagColor = .blue
+
+    var body: some View {
+        let usageCounts = appState.tagUsageCounts()
+
+        Form {
+            Section {
+                if appState.tagCatalog.isEmpty {
+                    Label("No tags yet", systemImage: "tag")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(appState.tagCatalog) { tag in
+                        TagSettingsRow(
+                            tag: tag,
+                            usageCount: usageCounts[tag.name] ?? 0
+                        )
+                    }
+                }
+            } header: {
+                Text("Catalog")
+            }
+
+            Section {
+                HStack(spacing: 8) {
+                    TextField("New tag", text: $newTagName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(addTag)
+                    TagColorMenu(color: newTagColor) { color in
+                        newTagColor = color
+                    }
+                    Button("Add") {
+                        addTag()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canAddTag)
+                }
+            } header: {
+                Text("Add tag")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var canAddTag: Bool {
+        let name = TagStore.cleanName(newTagName)
+        let key = TagStore.key(for: name)
+        return !name.isEmpty &&
+            !appState.tagCatalog.contains { TagStore.key(for: $0.name) == key }
+    }
+
+    private func addTag() {
+        guard canAddTag else { return }
+        appState.createTag(name: newTagName, color: newTagColor)
+        newTagName = ""
+    }
+}
+
+private struct TagSettingsRow: View {
+    let tag: Tag
+    let usageCount: Int
+
+    @Environment(AppState.self) private var appState
+    @State private var renameDraft: String
+
+    init(tag: Tag, usageCount: Int) {
+        self.tag = tag
+        self.usageCount = usageCount
+        _renameDraft = State(initialValue: tag.name)
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TagColorMenu(color: tag.color) { color in
+                appState.recolorTag(name: tag.name, to: color)
+            }
+
+            TextField("Tag name", text: $renameDraft)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 220)
+                .onSubmit(commitRename)
+
+            Button("Save") {
+                commitRename()
+            }
+            .controlSize(.small)
+            .disabled(!canRename)
+
+            Spacer()
+
+            Text("\(usageCount) use\(usageCount == 1 ? "" : "s")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button(role: .destructive) {
+                appState.deleteTag(name: tag.name)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .controlSize(.small)
+            .help("Delete tag and remove it from transcripts")
+        }
+        .onChange(of: tag.name) { _, newName in
+            renameDraft = newName
+        }
+    }
+
+    private var canRename: Bool {
+        let name = TagStore.cleanName(renameDraft)
+        let oldKey = TagStore.key(for: tag.name)
+        let newKey = TagStore.key(for: name)
+        guard !name.isEmpty, name != tag.name else { return false }
+        return oldKey == newKey ||
+            !appState.tagCatalog.contains { TagStore.key(for: $0.name) == newKey }
+    }
+
+    private func commitRename() {
+        guard canRename else { return }
+        appState.renameTag(tag.name, to: renameDraft)
+    }
+}
+
+private struct TagColorMenu: View {
+    let color: TagColor
+    let onSelect: (TagColor) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(TagColor.allCases, id: \.self) { option in
+                Button {
+                    onSelect(option)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark")
+                            .opacity(option == color ? 1 : 0)
+                        Circle()
+                            .fill(option.swiftUIColor)
+                            .frame(width: 10, height: 10)
+                        Text(option.displayName)
+                    }
+                }
+            }
+        } label: {
+            Circle()
+                .fill(color.swiftUIColor)
+                .frame(width: 18, height: 18)
+                .overlay {
+                    Circle()
+                        .stroke(.secondary.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Change tag color")
     }
 }
 

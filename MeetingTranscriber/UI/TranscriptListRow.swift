@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TranscriptListRow: View {
     let doc: TranscriptDocument
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -27,6 +28,18 @@ struct TranscriptListRow: View {
                     Text("·")
                     Image(systemName: "tray.and.arrow.down").imageScale(.small)
                 }
+                if !doc.tags.isEmpty {
+                    Text("·")
+                    ForEach(Array(doc.tags.prefix(3)), id: \.self) { tagName in
+                        CompactTagChip(
+                            name: tagName,
+                            color: appState.color(for: tagName).swiftUIColor
+                        )
+                    }
+                    if doc.tags.count > 3 {
+                        Text("+\(doc.tags.count - 3)")
+                    }
+                }
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -50,5 +63,29 @@ struct TranscriptListRow: View {
         return h > 0
             ? String(format: "%d:%02d:%02d", h, m, sec)
             : String(format: "%d:%02d", m, sec)
+    }
+}
+
+private struct CompactTagChip: View {
+    let name: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text(name)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 72, alignment: .leading)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.12), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(color.opacity(0.28), lineWidth: 0.5)
+        }
     }
 }

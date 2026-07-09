@@ -8,6 +8,8 @@ struct TranscriptDetailView: View {
 
     @State private var renamingSpeakerID: Int? = nil
     @State private var newSpeakerNameDraft: String = ""
+    @State private var showingAddTagPopover: Bool = false
+    @State private var tagNameDraft: String = ""
     @State private var titleDraft: String = ""
     @State private var justCopied: Bool = false
     @State private var summaryJustCopied: Bool = false
@@ -70,6 +72,7 @@ struct TranscriptDetailView: View {
                     AudioPlayerCard(player: audioPlayer)
                 }
                 speakersBlock(for: doc)
+                tagsBlock(for: doc)
                 summaryBlock(for: doc)
                 Divider()
                 transcriptBlock(for: doc)
@@ -241,6 +244,172 @@ struct TranscriptDetailView: View {
                                speakerID: id,
                                to: newSpeakerNameDraft)
         renamingSpeakerID = nil
+    }
+
+    // MARK: – Tags
+    @ViewBuilder
+    private func tagsBlock(for doc: TranscriptDocument) -> some View {
+        HStack(spacing: 8) {
+            ForEach(doc.tags, id: \.self) { tagName in
+                assignedTagChip(tagName)
+            }
+
+            Button {
+                tagNameDraft = ""
+                showingAddTagPopover = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 14, height: 14)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 5)
+            }
+            .buttonStyle(.glass)
+            .controlSize(.small)
+            .help("Add tag")
+            .popover(isPresented: $showingAddTagPopover, arrowEdge: .bottom) {
+                addTagPopover()
+            }
+
+            Spacer()
+        }
+    }
+
+    private func assignedTagChip(_ tagName: String) -> some View {
+        Button {
+            removeTag(tagName)
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(appState.color(for: tagName).swiftUIColor)
+                    .frame(width: 8, height: 8)
+                Text(tagName)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+        }
+        .buttonStyle(.glass)
+        .controlSize(.small)
+        .help("Remove \(tagName)")
+    }
+
+    @ViewBuilder
+    private func addTagPopover() -> some View {
+        let suggestions = tagSuggestions()
+        let canCreate = canCreateDraftTag()
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Add tag")
+                .font(.headline)
+            TextField("Tag name", text: $tagNameDraft)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 240)
+                .onSubmit { commitTagDraft() }
+
+            if !suggestions.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(suggestions) { tag in
+                            Button {
+                                addTag(tag.name)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(tag.color.swiftUIColor)
+                                        .frame(width: 8, height: 8)
+                                    Text(tag.name)
+                                    Spacer()
+                                }
+                                .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 3)
+                        }
+                    }
+                }
+                .frame(maxHeight: 160)
+            }
+
+            if canCreate {
+                Button {
+                    commitTagDraft()
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(nextAutoTagColor.swiftUIColor)
+                            .frame(width: 8, height: 8)
+                        Text("Create “\(trimmedTagDraft)”")
+                        Spacer()
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    showingAddTagPopover = false
+                    tagNameDraft = ""
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(12)
+    }
+
+    private var trimmedTagDraft: String {
+        TagStore.cleanName(tagNameDraft)
+    }
+
+    private var nextAutoTagColor: TagColor {
+        TagColor.allCases[appState.tagCatalog.count % TagColor.allCases.count]
+    }
+
+    /// Tags currently assigned to this transcript, read live from the store by
+    /// the stable `documentID`. Never use a captured `doc` snapshot here: the
+    /// add-tag popover holds its `doc` from presentation time, so a snapshot
+    /// goes stale and makes `setTags` operate on outdated tags.
+    private var currentTags: [String] {
+        document?.tags ?? []
+    }
+
+    private func tagSuggestions() -> [Tag] {
+        let assignedKeys = Set(currentTags.map { TagStore.key(for: $0) })
+        let query = TagStore.key(for: tagNameDraft)
+        return appState.tagCatalog.filter { tag in
+            let key = TagStore.key(for: tag.name)
+            guard !assignedKeys.contains(key) else { return false }
+            return query.isEmpty || key.contains(query)
+        }
+    }
+
+    private func canCreateDraftTag() -> Bool {
+        let name = trimmedTagDraft
+        let key = TagStore.key(for: name)
+        guard !name.isEmpty,
+              !currentTags.contains(where: { TagStore.key(for: $0) == key })
+        else { return false }
+        return !appState.tagCatalog.contains(where: { TagStore.key(for: $0.name) == key })
+    }
+
+    private func commitTagDraft() {
+        let name = trimmedTagDraft
+        guard !name.isEmpty else { return }
+        addTag(name)
+    }
+
+    private func addTag(_ name: String) {
+        appState.setTags(currentTags + [name], for: documentID)
+        tagNameDraft = ""
+        showingAddTagPopover = false
+    }
+
+    private func removeTag(_ name: String) {
+        let key = TagStore.key(for: name)
+        appState.setTags(currentTags.filter { TagStore.key(for: $0) != key }, for: documentID)
     }
 
     // MARK: – Summarize button

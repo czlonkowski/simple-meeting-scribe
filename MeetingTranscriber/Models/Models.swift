@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum TranscriptionLanguage: String, CaseIterable, Codable, Identifiable, Hashable {
     case english = "en"
@@ -101,6 +102,43 @@ struct GlossaryTerm: Codable, Identifiable, Hashable {
     var isEnabled: Bool = true
 }
 
+enum TagColor: String, Codable, CaseIterable, Hashable {
+    case blue
+    case green
+    case orange
+    case red
+    case purple
+    case pink
+    case teal
+    case yellow
+    case gray
+
+    var swiftUIColor: Color {
+        switch self {
+        case .blue:   return .blue
+        case .green:  return .green
+        case .orange: return .orange
+        case .red:    return .red
+        case .purple: return .purple
+        case .pink:   return .pink
+        case .teal:   return .teal
+        case .yellow: return .yellow
+        case .gray:   return .gray
+        }
+    }
+
+    var displayName: String {
+        rawValue.capitalized
+    }
+}
+
+struct Tag: Codable, Identifiable, Hashable {
+    var name: String
+    var color: TagColor
+
+    var id: String { name.lowercased() }
+}
+
 struct TranscriptDocument: Codable, Identifiable, Hashable {
     let id: String                // filename stem
     var title: String
@@ -114,6 +152,7 @@ struct TranscriptDocument: Codable, Identifiable, Hashable {
     let modelShortName: String
     var sourceURL: String?        // meeting URL or imported file path
     var sourceKind: SourceKind
+    var tags: [String] = []       // catalog tag names assigned to this recording
     var speakers: [SpeakerLabel]
     var segments: [TranscriptSegment]
     let audioFileName: String?    // basename of wav in the same dir
@@ -156,6 +195,7 @@ extension TranscriptDocument {
         modelShortName = try c.decode(String.self, forKey: .modelShortName)
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL)
         sourceKind = try c.decode(SourceKind.self, forKey: .sourceKind)
+        tags = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
         speakers = try c.decode([SpeakerLabel].self, forKey: .speakers)
         segments = try c.decode([TranscriptSegment].self, forKey: .segments)
         audioFileName = try c.decodeIfPresent(String.self, forKey: .audioFileName)

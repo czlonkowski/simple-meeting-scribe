@@ -2,7 +2,7 @@
 
 Meeting Transcriber exposes a local [Model Context Protocol](https://modelcontextprotocol.io)
 server while the app is running so Claude Code (or any other MCP-aware
-client on the same Mac) can list and read your transcripts.
+client on the same Mac) can list, read, filter, and tag your transcripts.
 
 ## What it is
 
@@ -13,16 +13,23 @@ client on the same Mac) can list and read your transcripts.
 - **Localhost only.** The listener is bound to the loopback interface,
   and the MCP transport rejects requests whose `Origin` header isn't
   localhost. Other devices on your network cannot reach it.
-- **Read-only.** No tool can record, delete, edit, or summarize. It
-  only reads files that already live in `~/Documents/MeetingTranscripts/`.
+- **Mostly read-only.** Tools cannot record, delete, or summarize. The
+  `set_tags` tool can replace a transcript's tag list through the running
+  app, and persists the updated transcript JSON/Markdown.
 
 ## Tools
 
 | Tool | Args | Returns |
 | --- | --- | --- |
-| `list_transcripts` | `query` (optional substring on title) | JSON array of `{ id, title, date, durationSeconds, language, hasSummary }`, newest first |
+| `list_transcripts` | `query` (optional substring on title), `tags` (optional array; transcript must contain all listed tags) | JSON array of `{ id, title, date, durationSeconds, language, hasSummary, tags }`, newest first |
+| `list_tags` | none | JSON array of `{ name, color, count }`, sorted by usage count |
 | `get_transcript` | `id` (required) | The full markdown transcript |
 | `get_summary` | `id` (required) | Markdown with the LLM summary, action items, and the model + timestamp. Errors if the transcript hasn't been summarized yet. |
+| `set_tags` | `id` (required), `tags` (required array) | Replaces the transcript's full tag list and returns `{ id, tags }`. Unknown tag names are auto-created in the managed catalog. |
+
+`set_tags` uses replace semantics: to add one tag, first read the current
+`tags` field from `list_transcripts`, append the new tag client-side, then
+send the complete replacement list.
 
 ## Connecting Claude Code
 
@@ -44,6 +51,8 @@ ask things like:
 
 - "Find my meeting with Acme last week and summarize the action items."
 - "Pull the transcript of `<title>` and quote the part where we discussed pricing."
+- "List my available tags, then show transcripts tagged `Client`."
+- "Set the tags on transcript `<id>` to `Client` and `Follow-up`."
 
 If the app isn't running, Claude Code will mark the server as down —
 launch Meeting Transcriber and re-run the request.
@@ -77,7 +86,7 @@ curl -sS http://127.0.0.1:47823/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-A healthy response is a JSON-RPC envelope listing the three tools
+A healthy response is a JSON-RPC envelope listing the five tools
 above.
 
 ## Limits and non-goals

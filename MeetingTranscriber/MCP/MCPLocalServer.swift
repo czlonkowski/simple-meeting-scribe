@@ -3,8 +3,8 @@ import Network
 import MCP
 
 /// Hosts a tiny Model Context Protocol server bound to 127.0.0.1 so Claude
-/// Code (and any other MCP client) running on the same Mac can list and read
-/// local transcripts while the app is open.
+/// Code (and any other MCP client) running on the same Mac can list, read, and
+/// tag local transcripts while the app is open.
 ///
 /// Wire protocol: MCP "Streamable HTTP" via `StatelessHTTPServerTransport`.
 /// The SDK transport is framework-agnostic — we feed it parsed `HTTPRequest`
@@ -151,7 +151,7 @@ final class MCPLocalServer: @unchecked Sendable {
         let server = Server(
             name: "meeting-transcriber",
             version: "0.1.0",
-            instructions: "Search and read locally stored meeting transcripts.",
+            instructions: "Search, read, and tag locally stored meeting transcripts.",
             capabilities: .init(tools: .init(listChanged: false))
         )
         await registerHandlers(on: server)

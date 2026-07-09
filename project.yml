@@ -30,7 +30,7 @@ packages:
     from: "0.12.0"
   mlx-swift-lm:
     url: https://github.com/ml-explore/mlx-swift-lm
-    from: "3.31.3"
+    from: "3.31.4"
   swift-transformers:
     url: https://github.com/huggingface/swift-transformers
     from: "1.1.6"
@@ -61,6 +61,8 @@ targets:
         product: MLXLMCommon
       - package: mlx-swift-lm
         product: MLXHuggingFace
+      - package: mlx-swift-lm
+        product: MLXVLM
       - package: swift-transformers
         product: Tokenizers
       - package: swift-huggingface

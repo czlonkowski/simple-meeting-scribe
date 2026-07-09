@@ -8,6 +8,12 @@ private let recordScreenKey = "recordScreenByDefault"
 @MainActor
 @Observable
 final class AppState {
+    static weak var shared: AppState?
+
+    init() {
+        Self.shared = self
+    }
+
     // MARK: – Settings
     var selectedModel: WhisperModel = .largeV3Turbo
     var defaultLanguage: TranscriptionLanguage = .english
@@ -599,6 +605,7 @@ final class AppState {
     // MARK: – Library
     var transcripts: [TranscriptDocument] = []
     var selectedTranscriptID: String? = nil
+    var tagCatalog: [Tag] = []
 
     // MARK: – UI triggers
     var importPanelRequested: Bool = false
@@ -614,8 +621,17 @@ final class AppState {
     func bootstrap() async {
         guard !didBootstrap else { return }
         didBootstrap = true
+        loadTagCatalog()
         await loadTranscripts()
         startMeetingDetection()
+    }
+
+    private func loadTagCatalog() {
+        do {
+            tagCatalog = try TagStore.shared.loadAll()
+        } catch {
+            lastError = "Could not load tags: \(error.localizedDescription)"
+        }
     }
 
     func loadTranscripts() async {
@@ -968,6 +984,7 @@ final class AppState {
             modelShortName: fresh.modelShortName,
             sourceURL: existing.sourceURL,
             sourceKind: existing.sourceKind,
+            tags: existing.tags,
             speakers: fresh.speakers,
             segments: fresh.segments,
             audioFileName: existing.audioFileName,
@@ -1025,5 +1042,131 @@ final class AppState {
               let sIdx = transcripts[tIdx].speakers.firstIndex(where: { $0.id == speakerID }) else { return }
         transcripts[tIdx].speakers[sIdx].name = trimmed
         try? TranscriptStore.shared.save(transcripts[tIdx], audioSource: nil)
+    }
+
+    // MARK: – Tags
+    func setTags(_ names: [String], for id: String) {
+        guard let idx = transcripts.firstIndex(where: { $0.id == id }) else { return }
+        let cleaned = dedupedTagNames(names)
+
+        do {
+            tagCatalog = try TagStore.shared.ensure(names: cleaned)
+        } catch {
+            lastError = "Could not update tags: \(error.localizedDescription)"
+            return
+        }
+
+        let canonical = cleaned.map { canonicalTagName(for: $0) ?? $0 }
+        guard transcripts[idx].tags != canonical else { return }
+        transcripts[idx].tags = canonical
+        try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+    }
+
+    func createTag(name: String, color: TagColor) {
+        let cleaned = TagStore.cleanName(name)
+        guard !cleaned.isEmpty else { return }
+        let key = TagStore.key(for: cleaned)
+        guard !tagCatalog.contains(where: { TagStore.key(for: $0.name) == key }) else { return }
+
+        tagCatalog.append(Tag(name: cleaned, color: color))
+        persistTagCatalog()
+    }
+
+    func recolorTag(name: String, to color: TagColor) {
+        let key = TagStore.key(for: name)
+        guard let idx = tagCatalog.firstIndex(where: { TagStore.key(for: $0.name) == key }) else { return }
+        guard tagCatalog[idx].color != color else { return }
+        tagCatalog[idx].color = color
+        persistTagCatalog()
+    }
+
+    func renameTag(_ oldName: String, to newName: String) {
+        let oldKey = TagStore.key(for: oldName)
+        let cleanedNewName = TagStore.cleanName(newName)
+        let newKey = TagStore.key(for: cleanedNewName)
+        guard !oldKey.isEmpty, !newKey.isEmpty,
+              let catalogIdx = tagCatalog.firstIndex(where: { TagStore.key(for: $0.name) == oldKey })
+        else { return }
+
+        if oldKey != newKey,
+           tagCatalog.contains(where: { TagStore.key(for: $0.name) == newKey }) {
+            lastError = "A tag named “\(cleanedNewName)” already exists."
+            return
+        }
+
+        tagCatalog[catalogIdx].name = cleanedNewName
+        persistTagCatalog()
+
+        for idx in transcripts.indices {
+            let renamed = transcripts[idx].tags.map { tagName in
+                TagStore.key(for: tagName) == oldKey ? cleanedNewName : tagName
+            }
+            let deduped = dedupedTagNames(renamed)
+            guard transcripts[idx].tags != deduped else { continue }
+            transcripts[idx].tags = deduped
+            try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+        }
+    }
+
+    func deleteTag(name: String) {
+        let key = TagStore.key(for: name)
+        guard tagCatalog.contains(where: { TagStore.key(for: $0.name) == key }) else { return }
+        tagCatalog.removeAll { TagStore.key(for: $0.name) == key }
+        persistTagCatalog()
+
+        for idx in transcripts.indices {
+            let filtered = transcripts[idx].tags.filter { TagStore.key(for: $0) != key }
+            guard transcripts[idx].tags != filtered else { continue }
+            transcripts[idx].tags = filtered
+            try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+        }
+    }
+
+    func color(for name: String) -> TagColor {
+        canonicalTag(for: name)?.color ?? .gray
+    }
+
+    func tagUsageCounts() -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for doc in transcripts {
+            for name in doc.tags {
+                let canonical = canonicalTagName(for: name) ?? TagStore.cleanName(name)
+                guard !canonical.isEmpty else { continue }
+                counts[canonical, default: 0] += 1
+            }
+        }
+        return counts
+    }
+
+    private func persistTagCatalog() {
+        do {
+            try TagStore.shared.save(tagCatalog)
+            tagCatalog = try TagStore.shared.loadAll()
+        } catch {
+            lastError = "Could not save tags: \(error.localizedDescription)"
+        }
+    }
+
+    private func dedupedTagNames(_ names: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for rawName in names {
+            let name = TagStore.cleanName(rawName)
+            guard !name.isEmpty else { continue }
+            let key = TagStore.key(for: name)
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(name)
+        }
+        return result
+    }
+
+    private func canonicalTag(for name: String) -> Tag? {
+        let key = TagStore.key(for: name)
+        return tagCatalog.first(where: { TagStore.key(for: $0.name) == key })
+    }
+
+    private func canonicalTagName(for name: String) -> String? {
+        canonicalTag(for: name)?.name
     }
 }

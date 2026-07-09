@@ -20,6 +20,7 @@ struct RootView: View {
     @State private var showFileImporter: Bool = false
     @State private var pendingImport: PendingImport? = nil
     @State private var pendingDelete: TranscriptDocument? = nil
+    @State private var activeTagFilters: Set<String> = []
     /// When false (the default), recordings under `ghostDurationThreshold`
     /// with no usable segments are hidden from the sidebar — see
     /// `isGhostRecording`. Search overrides this so a query always finds
@@ -46,16 +47,25 @@ struct RootView: View {
 
     private var filteredTranscripts: [TranscriptDocument] {
         let base: [TranscriptDocument]
-        if query.isEmpty && !showShortRecordings {
+        if query.isEmpty && activeTagFilters.isEmpty && !showShortRecordings {
             base = appState.transcripts.filter { !Self.isGhostRecording($0) }
         } else {
             base = appState.transcripts
         }
-        guard !query.isEmpty else { return base }
-        let q = query.lowercased()
-        return base.filter { doc in
+
+        let tagFiltered = activeTagFilters.isEmpty
+            ? base
+            : base.filter { doc in
+                let docTags = Set(doc.tags.map { TagStore.key(for: $0) })
+                return activeTagFilters.allSatisfy { docTags.contains($0) }
+            }
+
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return tagFiltered }
+        return tagFiltered.filter { doc in
             doc.title.lowercased().contains(q) ||
-            doc.segments.contains(where: { $0.text.lowercased().contains(q) })
+            doc.segments.contains(where: { $0.text.lowercased().contains(q) }) ||
+            doc.tags.contains(where: { $0.lowercased().contains(q) })
         }
     }
 
@@ -203,7 +213,55 @@ struct RootView: View {
         }
         .navigationTitle("Meeting Transcriber")
         .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
-        .searchable(text: $query, placement: .sidebar, prompt: "Search transcripts")
+        .searchable(text: $query, placement: .sidebar, prompt: "Search transcripts and tags")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                tagFilterMenu
+            }
+        }
+    }
+
+    @ViewBuilder private var tagFilterMenu: some View {
+        Menu {
+            if !activeTagFilters.isEmpty {
+                Button("Clear tag filters") {
+                    activeTagFilters.removeAll()
+                }
+                Divider()
+            }
+
+            if appState.tagCatalog.isEmpty {
+                Text("No tags")
+            } else {
+                ForEach(appState.tagCatalog) { tag in
+                    let key = TagStore.key(for: tag.name)
+                    Button {
+                        toggleTagFilter(tag.name)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark")
+                                .opacity(activeTagFilters.contains(key) ? 1 : 0)
+                            Circle()
+                                .fill(tag.color.swiftUIColor)
+                                .frame(width: 8, height: 8)
+                            Text(tag.name)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Tags", systemImage: activeTagFilters.isEmpty ? "tag" : "tag.fill")
+        }
+        .help("Filter transcripts by tag")
+    }
+
+    private func toggleTagFilter(_ tagName: String) {
+        let key = TagStore.key(for: tagName)
+        if activeTagFilters.contains(key) {
+            activeTagFilters.remove(key)
+        } else {
+            activeTagFilters.insert(key)
+        }
     }
 
     // MARK: – Detail
