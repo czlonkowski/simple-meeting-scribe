@@ -20,6 +20,7 @@
 		34DF45DFF7A8567BA2A8D539 /* MeetingTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78BB74557480491478111DD /* MeetingTranscriberApp.swift */; };
 		372BE3AE343ECE4A90D30F6E /* TagStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7553778A8A8B77A6E443E32C /* TagStore.swift */; };
 		4284E5DF07B438BFFDBA023B /* RecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C08E8F4B6F85AE23697D53 /* RecordView.swift */; };
+		43BB2DFE3FAA6994DF29D2C5 /* ProcessScriptRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57920CC8168C694C339B133 /* ProcessScriptRunnerTests.swift */; };
 		44D42EDA36B30BF7DB95C988 /* LanguageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D06AD4E21191BEAF30724A64 /* LanguageModel.swift */; };
 		45C45A85E32A566BC2BF1D10 /* Text+Markdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CDCBE17C1A2116FDE64DE7 /* Text+Markdown.swift */; };
 		46E3330B546648C2A6F0EF5C /* TranscriptMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D07A7BB979EB354E14F0529E /* TranscriptMerger.swift */; };
@@ -41,6 +42,7 @@
 		7E2666768562D174D44038B7 /* TranscriptionPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6602515950B34F876B321764 /* TranscriptionPipeline.swift */; };
 		84F5A827CAE4E0272CD65EC3 /* MeetingJoinSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A695BDA0BDC7F7DA22A91CEB /* MeetingJoinSheet.swift */; };
 		87348EDA9294BD109B7D3B00 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = EC8545E2DC0567358173AD7B /* WhisperKit */; };
+		8CDE1BB3AA1C09720FAF1868 /* BrowserURLQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31CAE064B962477AD977CB2 /* BrowserURLQuery.swift */; };
 		998D5E8835266BBE6FF26E1E /* MenuBarLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E622EAF11FAFF2105CB9E /* MenuBarLabel.swift */; };
 		99F1AB11ECD8A5BE5DAA52C2 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B051221F75C91039F1F7951 /* MenuBarMenu.swift */; };
 		9DBDAA1E4F058C3523E65770 /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C603C6C0CA3E5F2925084A6 /* MediaImporter.swift */; };
@@ -60,7 +62,19 @@
 		DE7185F5C9D8CC94B956BA12 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C8072DD9DA5CE0CB00722E /* SettingsView.swift */; };
 		F2B91F23BC34499C84F3DB78 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29F0AD58655A7C4E5F3E987 /* AppState.swift */; };
 		F780EEC8187DDBF76877E5FA /* MCPLocalServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB18A34984713FF19D952CFF /* MCPLocalServer.swift */; };
+		F8FE95679B863CFC10AB44BB /* MeetingDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFFC6E02D883DDE51789ACAE /* MeetingDetectorTests.swift */; };
+		FAD8AF8C0281E200C4D53734 /* TranscriptStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5BA556041EBAEF9A0F7989FA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BDDF3CCDB22A759D0534A39A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 16E4487E6357E795F6317690;
+			remoteInfo = MeetingTranscriber;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		015358D0FDB8C567B6506CE0 /* TranscriptStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStore.swift; sourceTree = "<group>"; };
@@ -70,8 +84,10 @@
 		1C72F83AAB72FB3D681FAF15 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		22DD73103EF9029FE0045631 /* WhisperEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperEngine.swift; sourceTree = "<group>"; };
 		2AD253098B51F28EB52CB220 /* WordReplacementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordReplacementService.swift; sourceTree = "<group>"; };
+		2C3FD453776A27452485ACF7 /* MeetingTranscriberTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeetingTranscriberTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DE300DB0019AB62E18682B6 /* TranscriptListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptListRow.swift; sourceTree = "<group>"; };
 		30CBCA74D37875EDD1433BCF /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
+		34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreTests.swift; sourceTree = "<group>"; };
 		4246F4B0562F70223BDBE3AF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		48B9C8A0387E7A87C2517C2A /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		4C603C6C0CA3E5F2925084A6 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
@@ -91,9 +107,11 @@
 		956B473FF8328A5939AFAC93 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		9580D9A82FEF7CAA918C1603 /* meeting-patterns.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "meeting-patterns.json"; sourceTree = "<group>"; };
 		9B051221F75C91039F1F7951 /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
+		A31CAE064B962477AD977CB2 /* BrowserURLQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURLQuery.swift; sourceTree = "<group>"; };
 		A695BDA0BDC7F7DA22A91CEB /* MeetingJoinSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingJoinSheet.swift; sourceTree = "<group>"; };
 		A9CAE8E9C764D6CDA49107B1 /* DictionaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryStore.swift; sourceTree = "<group>"; };
 		A9DF34BD84516093E582B6AD /* ImportFileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFileSheet.swift; sourceTree = "<group>"; };
+		AFFC6E02D883DDE51789ACAE /* MeetingDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetectorTests.swift; sourceTree = "<group>"; };
 		B1DBF4A5AA0765B8AC813D0A /* AudioPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerCard.swift; sourceTree = "<group>"; };
 		B6ABDE44BDC61598CB0A80C1 /* VideoPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerCard.swift; sourceTree = "<group>"; };
 		BC3853E93A2C23F7C34E06B9 /* SummaryPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryPrompts.swift; sourceTree = "<group>"; };
@@ -108,6 +126,7 @@
 		E78BB74557480491478111DD /* MeetingTranscriberApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingTranscriberApp.swift; sourceTree = "<group>"; };
 		F105B4670016A20D4E3C3232 /* AudioMixdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMixdown.swift; sourceTree = "<group>"; };
 		F29E622EAF11FAFF2105CB9E /* MenuBarLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabel.swift; sourceTree = "<group>"; };
+		F57920CC8168C694C339B133 /* ProcessScriptRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessScriptRunnerTests.swift; sourceTree = "<group>"; };
 		F780F1F7EDA08945B6E2E001 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		FB18A34984713FF19D952CFF /* MCPLocalServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPLocalServer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -160,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				1D87A1CBD596F3924C866848 /* MeetingTranscriber */,
+				ACD37D8B6CD48EA3DF24C6EA /* MeetingTranscriberTests */,
 				5FAF01AA93CF755F59A2E941 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -168,6 +188,7 @@
 			isa = PBXGroup;
 			children = (
 				871793653FE4199B7382D81D /* MeetingTranscriber.app */,
+				2C3FD453776A27452485ACF7 /* MeetingTranscriberTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -202,6 +223,16 @@
 				747B97F80070E768617576E9 /* MCPTools.swift */,
 			);
 			path = MCP;
+			sourceTree = "<group>";
+		};
+		ACD37D8B6CD48EA3DF24C6EA /* MeetingTranscriberTests */ = {
+			isa = PBXGroup;
+			children = (
+				AFFC6E02D883DDE51789ACAE /* MeetingDetectorTests.swift */,
+				F57920CC8168C694C339B133 /* ProcessScriptRunnerTests.swift */,
+				34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */,
+			);
+			path = MeetingTranscriberTests;
 			sourceTree = "<group>";
 		};
 		AE6798F2C06087E366A17E09 /* Transcribe */ = {
@@ -264,6 +295,7 @@
 			isa = PBXGroup;
 			children = (
 				956B473FF8328A5939AFAC93 /* AudioRecorder.swift */,
+				A31CAE064B962477AD977CB2 /* BrowserURLQuery.swift */,
 				30CBCA74D37875EDD1433BCF /* MeetingDetector.swift */,
 				E0100D04561D3DA136184D52 /* MixerWriter.swift */,
 				159BFB364327253A27D37567 /* RecordingCoordinator.swift */,
@@ -304,6 +336,24 @@
 			productReference = 871793653FE4199B7382D81D /* MeetingTranscriber.app */;
 			productType = "com.apple.product-type.application";
 		};
+		78F66930B01C8975F600135B /* MeetingTranscriberTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FC4DCE8B5ED12A10AA7D76C8 /* Build configuration list for PBXNativeTarget "MeetingTranscriberTests" */;
+			buildPhases = (
+				AC746236EC5A8A93C9359798 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A8666FEEBECC77C07BD7C258 /* PBXTargetDependency */,
+			);
+			name = MeetingTranscriberTests;
+			packageProductDependencies = (
+			);
+			productName = MeetingTranscriberTests;
+			productReference = 2C3FD453776A27452485ACF7 /* MeetingTranscriberTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -314,6 +364,10 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					16E4487E6357E795F6317690 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					78F66930B01C8975F600135B = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -342,6 +396,7 @@
 			projectRoot = "";
 			targets = (
 				16E4487E6357E795F6317690 /* MeetingTranscriber */,
+				78F66930B01C8975F600135B /* MeetingTranscriberTests */,
 			);
 		};
 /* End PBXProject section */
@@ -359,6 +414,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AC746236EC5A8A93C9359798 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8FE95679B863CFC10AB44BB /* MeetingDetectorTests.swift in Sources */,
+				43BB2DFE3FAA6994DF29D2C5 /* ProcessScriptRunnerTests.swift in Sources */,
+				FAD8AF8C0281E200C4D53734 /* TranscriptStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D3AC5A31E168334F07CD7837 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -367,6 +432,7 @@
 				691C9A5CB146B9B0172127E6 /* AudioMixdown.swift in Sources */,
 				2AD40271BB8DAC23E08BD939 /* AudioPlayerCard.swift in Sources */,
 				6774761336C49091EB654940 /* AudioRecorder.swift in Sources */,
+				8CDE1BB3AA1C09720FAF1868 /* BrowserURLQuery.swift in Sources */,
 				C5986FA66B79453646B53B7D /* DiarizationEngine.swift in Sources */,
 				507944D8E868E78874A1D649 /* DictionaryStore.swift in Sources */,
 				2CEEF2595E69E677AEF89E33 /* ImportFileSheet.swift in Sources */,
@@ -410,6 +476,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A8666FEEBECC77C07BD7C258 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 16E4487E6357E795F6317690 /* MeetingTranscriber */;
+			targetProxy = 5BA556041EBAEF9A0F7989FA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		1A21D51D25C6BFE8601B7493 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -425,6 +499,46 @@
 				SDKROOT = macosx;
 			};
 			name = Release;
+		};
+		34A2A8F296B0DE0D3B0161F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.czlonkowski.MeetingTranscriberTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetingTranscriber.app/Contents/MacOS/MeetingTranscriber";
+			};
+			name = Release;
+		};
+		67A924D5D33B73D1C9FA58D5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.czlonkowski.MeetingTranscriberTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetingTranscriber.app/Contents/MacOS/MeetingTranscriber";
+			};
+			name = Debug;
 		};
 		B2B775A0B9336AA8A77A9C41 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -601,6 +715,15 @@
 			buildConfigurations = (
 				C032968F3C0BA77D8BE297BF /* Debug */,
 				ED34D9841AF90D35F824D2BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FC4DCE8B5ED12A10AA7D76C8 /* Build configuration list for PBXNativeTarget "MeetingTranscriberTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				67A924D5D33B73D1C9FA58D5 /* Debug */,
+				34A2A8F296B0DE0D3B0161F3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

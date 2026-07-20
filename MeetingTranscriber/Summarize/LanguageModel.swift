@@ -4,7 +4,7 @@ import Foundation
 /// HuggingFace repo ID. Text-only models load through MLXLLM's
 /// `LLMModelFactory`; VLM-class models (Gemma 4 is `gemma4` / `gemma4_unified`)
 /// load through `VLMModelFactory` — see `loadsViaVLMFactory`.
-enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable {
+enum LanguageModel: String, CaseIterable, Codable, Identifiable, Hashable, Sendable {
     case gemma4_12b_it_mlx_4bit = "mlx-community/gemma-4-12B-it-4bit"
     case qwen3_5_4b_mlx_8bit    = "mlx-community/Qwen3.5-4B-8bit"
     case qwen3_5_9b_mlx_4bit    = "mlx-community/Qwen3.5-9B-MLX-4bit"

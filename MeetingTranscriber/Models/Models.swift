@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum TranscriptionLanguage: String, CaseIterable, Codable, Identifiable, Hashable {
+enum TranscriptionLanguage: String, CaseIterable, Codable, Identifiable, Hashable, Sendable {
     case english = "en"
     case polish  = "pl"
 
@@ -72,7 +72,7 @@ struct DetectedMeeting: Equatable, Hashable, Identifiable {
     func hash(into hasher: inout Hasher) { hasher.combine(url) }
 }
 
-struct TranscriptSegment: Codable, Identifiable, Hashable {
+struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
     var id: UUID = UUID()
     let start: Double   // seconds
     let end: Double     // seconds
@@ -80,7 +80,7 @@ struct TranscriptSegment: Codable, Identifiable, Hashable {
     let text: String
 }
 
-struct SpeakerLabel: Codable, Hashable, Identifiable {
+struct SpeakerLabel: Codable, Hashable, Identifiable, Sendable {
     let id: Int
     var name: String
 }
@@ -139,7 +139,7 @@ struct Tag: Codable, Identifiable, Hashable {
     var id: String { name.lowercased() }
 }
 
-struct TranscriptDocument: Codable, Identifiable, Hashable {
+struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     let id: String                // filename stem
     var title: String
     let date: Date                // when this was transcribed / created in-app
@@ -173,7 +173,7 @@ struct TranscriptDocument: Codable, Identifiable, Hashable {
     /// otherwise the transcription date.
     var displayDate: Date { recordedAt ?? date }
 
-    enum SourceKind: String, Codable {
+    enum SourceKind: String, Codable, Sendable {
         case live
         case imported
     }

@@ -636,8 +636,11 @@ final class AppState {
 
     func loadTranscripts() async {
         do {
-            let loaded = try TranscriptStore.shared.loadAll()
-            self.transcripts = loaded.sorted { $0.displayDate > $1.displayDate }
+            let rootURL = TranscriptStore.shared.rootURL
+            let loaded = try await Task.detached(priority: .userInitiated) {
+                try TranscriptStore.decodeAll(at: rootURL)
+            }.value
+            self.transcripts = loaded
         } catch {
             self.lastError = "Could not load transcripts: \(error.localizedDescription)"
         }

@@ -1,174 +1,267 @@
-import Foundation
 import AppKit
+import Foundation
 
 /// Polls running browsers for the active tab URL and emits `onMeetingDetected`
-/// when the URL matches a known meeting pattern. Supports Arc, Safari, and
-/// Google Chrome — any combination can be running; the detector picks up
-/// whichever one has a meeting tab.
+/// when the URL matches a known meeting pattern. Browser automation is isolated
+/// in bounded helper processes so a hung browser can never block AppKit.
+@MainActor
 final class MeetingDetector {
-    struct Pattern { let name: String; let regex: NSRegularExpression }
-
-    /// One browser we know how to query via AppleScript.
-    private struct Browser {
-        let name: String          // shown to the user / used for log messages
-        let bundleID: String
-        /// AppleScript source. Must return the front window's active tab URL,
-        /// or an empty string when there's nothing to report. Each browser has
-        /// its own terminology (Safari uses `current tab`, others `active tab`).
-        let scriptSource: String
+    struct Pattern {
+        let name: String
+        let regex: NSRegularExpression
     }
 
-    private static let browsers: [Browser] = [
-        Browser(
+    typealias RunningBrowserProvider = @MainActor @Sendable () -> Set<String>
+
+    static let defaultBrowsers: [BrowserDescriptor] = [
+        BrowserDescriptor(
             name: "Arc",
             bundleID: "company.thebrowser.Browser",
             scriptSource: """
             tell application "Arc"
                 if not running then return ""
                 if (count of windows) = 0 then return ""
-                try
-                    return URL of active tab of front window
-                on error
-                    return ""
-                end try
+                return URL of active tab of front window
             end tell
             """
         ),
-        Browser(
+        BrowserDescriptor(
             name: "Safari",
             bundleID: "com.apple.Safari",
             scriptSource: """
             tell application "Safari"
                 if not running then return ""
                 if (count of windows) = 0 then return ""
-                try
-                    return URL of current tab of front window
-                on error
-                    return ""
-                end try
+                return URL of current tab of front window
             end tell
             """
         ),
-        Browser(
+        BrowserDescriptor(
             name: "Chrome",
             bundleID: "com.google.Chrome",
             scriptSource: """
             tell application "Google Chrome"
                 if not running then return ""
                 if (count of windows) = 0 then return ""
-                try
-                    return URL of active tab of front window
-                on error
-                    return ""
-                end try
+                return URL of active tab of front window
             end tell
             """
         ),
     ]
 
-    private var patterns: [Pattern] = []
-    private var pollTimer: Timer?
+    private let browsers: [BrowserDescriptor]
+    private let query: any BrowserURLQuerying
+    private let pollIntervalNanoseconds: UInt64
+    private let runningBrowserIDs: RunningBrowserProvider
+    private let workspaceNotificationCenter: NotificationCenter?
+    private var patterns: [Pattern]
+    private var pollTask: Task<Void, Never>?
+    private var pollGeneration: UInt = 0
     private var lastReportedURL: String?
+    private var failingBrowserIDs: Set<String> = []
     private var launchObserver: NSObjectProtocol?
     private var terminateObserver: NSObjectProtocol?
+    private var isStarted = false
 
     var onMeetingDetected: ((DetectedMeeting) -> Void)?
 
+    init(
+        browsers: [BrowserDescriptor] = MeetingDetector.defaultBrowsers,
+        patterns: [Pattern] = [],
+        query: any BrowserURLQuerying = OSAScriptBrowserURLQuery(),
+        pollIntervalNanoseconds: UInt64 = 2_000_000_000,
+        runningBrowserIDs: @escaping RunningBrowserProvider = {
+            Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        },
+        workspaceNotificationCenter: NotificationCenter? = NSWorkspace.shared.notificationCenter
+    ) {
+        self.browsers = browsers
+        self.patterns = patterns
+        self.query = query
+        self.pollIntervalNanoseconds = pollIntervalNanoseconds
+        self.runningBrowserIDs = runningBrowserIDs
+        self.workspaceNotificationCenter = workspaceNotificationCenter
+    }
+
     func start() {
-        patterns = Self.loadPatterns()
-        let supportedIDs = Set(Self.browsers.map(\.bundleID))
-
-        launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didLaunchApplicationNotification,
-            object: nil, queue: .main
-        ) { [weak self] note in
-            guard let self,
-                  let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                  let id = app.bundleIdentifier, supportedIDs.contains(id)
-            else { return }
-            self.ensureTimerRunning()
-        }
-        terminateObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didTerminateApplicationNotification,
-            object: nil, queue: .main
-        ) { [weak self] note in
-            guard let self,
-                  let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                  let id = app.bundleIdentifier, supportedIDs.contains(id)
-            else { return }
-            // Timer stays on as long as *any* supported browser is running.
-            if self.runningBrowsers().isEmpty { self.stopTimer() }
+        guard !isStarted else { return }
+        isStarted = true
+        if patterns.isEmpty {
+            patterns = Self.loadPatterns()
         }
 
-        if !runningBrowsers().isEmpty { ensureTimerRunning() }
+        let supportedIDs = Set(browsers.map(\.bundleID))
+        if let notificationCenter = workspaceNotificationCenter {
+            launchObserver = notificationCenter.addObserver(
+                forName: NSWorkspace.didLaunchApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                Task { @MainActor in
+                    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey]
+                            as? NSRunningApplication,
+                          let id = app.bundleIdentifier,
+                          supportedIDs.contains(id)
+                    else { return }
+                    self?.ensurePolling()
+                }
+            }
+            terminateObserver = notificationCenter.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                Task { @MainActor in
+                    guard let self,
+                          let app = note.userInfo?[NSWorkspace.applicationUserInfoKey]
+                            as? NSRunningApplication,
+                          let id = app.bundleIdentifier,
+                          supportedIDs.contains(id)
+                    else { return }
+                    if self.runningBrowsers().isEmpty {
+                        self.stopPolling(resetLastURL: true)
+                    }
+                }
+            }
+        }
+
+        if !runningBrowsers().isEmpty {
+            ensurePolling()
+        }
     }
 
     func stop() {
-        stopTimer()
-        if let obs = launchObserver    { NotificationCenter.default.removeObserver(obs) }
-        if let obs = terminateObserver { NotificationCenter.default.removeObserver(obs) }
+        guard isStarted else { return }
+        isStarted = false
+        stopPolling(resetLastURL: true)
+        if let launchObserver {
+            workspaceNotificationCenter?.removeObserver(launchObserver)
+        }
+        if let terminateObserver {
+            workspaceNotificationCenter?.removeObserver(terminateObserver)
+        }
+        launchObserver = nil
+        terminateObserver = nil
     }
 
-    private func runningBrowsers() -> [Browser] {
-        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        return Self.browsers.filter { running.contains($0.bundleID) }
+    private func runningBrowsers() -> [BrowserDescriptor] {
+        let running = runningBrowserIDs()
+        return browsers.filter { running.contains($0.bundleID) }
     }
 
-    private func ensureTimerRunning() {
-        guard pollTimer == nil else { return }
-        let t = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in self?.poll() }
-        RunLoop.main.add(t, forMode: .common)
-        pollTimer = t
-        poll()
+    private func ensurePolling() {
+        guard isStarted, pollTask == nil else { return }
+        pollGeneration &+= 1
+        let generation = pollGeneration
+        pollTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.pollGeneration == generation {
+                    self.pollTask = nil
+                }
+            }
+
+            while !Task.isCancelled {
+                guard await self.pollOnce() else { return }
+                do {
+                    try await Task.sleep(nanoseconds: self.pollIntervalNanoseconds)
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
-    private func stopTimer() {
-        pollTimer?.invalidate()
-        pollTimer = nil
-        lastReportedURL = nil
+    private func stopPolling(resetLastURL: Bool) {
+        pollGeneration &+= 1
+        pollTask?.cancel()
+        pollTask = nil
+        failingBrowserIDs.removeAll()
+        if resetLastURL {
+            lastReportedURL = nil
+        }
     }
 
-    private func poll() {
+    private func pollOnce() async -> Bool {
         let running = runningBrowsers()
-        guard !running.isEmpty else { stopTimer(); return }
+        guard !running.isEmpty else {
+            lastReportedURL = nil
+            return false
+        }
 
-        // Ask each running browser for its active URL and return the first
-        // meeting match. Browsers are tried in the declared order (Arc first).
+        let results = await withTaskGroup(
+            of: (String, BrowserURLQueryResult).self,
+            returning: [String: BrowserURLQueryResult].self
+        ) { group in
+            for browser in running {
+                group.addTask { [query] in
+                    (browser.bundleID, await query.activeURL(for: browser))
+                }
+            }
+
+            var collected: [String: BrowserURLQueryResult] = [:]
+            for await (bundleID, result) in group {
+                collected[bundleID] = result
+            }
+            return collected
+        }
+
+        guard !Task.isCancelled else { return false }
+
         for browser in running {
-            guard let url = fetchURL(from: browser), !url.isEmpty else { continue }
-            guard let pattern = patterns.first(where: { $0.regex.firstMatch(
-                in: url, range: NSRange(url.startIndex..., in: url)) != nil })
+            guard let result = results[browser.bundleID] else { continue }
+            logTransition(for: browser, result: result)
+            guard case .url(let url) = result,
+                  let pattern = patterns.first(where: { $0.regex.firstMatch(
+                    in: url,
+                    range: NSRange(url.startIndex..., in: url)
+                  ) != nil })
             else { continue }
 
-            if url == lastReportedURL { return }
+            if url == lastReportedURL { return true }
             lastReportedURL = url
-            let meeting = DetectedMeeting(
+            onMeetingDetected?(DetectedMeeting(
                 title: meetingTitle(for: url, platform: pattern.name),
                 platform: pattern.name,
                 url: url,
                 detectedAt: Date(),
                 browserBundleID: browser.bundleID
-            )
-            onMeetingDetected?(meeting)
-            return
+            ))
+            return true
         }
 
-        // No matches right now — keep lastReportedURL so a tab-switch back
-        // to the same meeting URL doesn't immediately re-trigger.
+        // Preserve the last reported URL so switching away and immediately
+        // back to the same meeting tab does not re-trigger the sheet.
+        return true
     }
 
-    private func fetchURL(from browser: Browser) -> String? {
-        guard let script = NSAppleScript(source: browser.scriptSource) else { return nil }
-        var error: NSDictionary?
-        let result = script.executeAndReturnError(&error)
-        if error != nil { return nil }
-        return result.stringValue
+    private func logTransition(for browser: BrowserDescriptor, result: BrowserURLQueryResult) {
+        switch result {
+        case .timedOut:
+            if failingBrowserIDs.insert(browser.bundleID).inserted {
+                Log.browserDetection.warning("\(browser.name, privacy: .public) query timed out")
+            }
+        case .failed(let message):
+            if failingBrowserIDs.insert(browser.bundleID).inserted {
+                Log.browserDetection.warning(
+                    "\(browser.name, privacy: .public) query failed: \(message, privacy: .public)"
+                )
+            }
+        case .url, .noURL:
+            if failingBrowserIDs.remove(browser.bundleID) != nil {
+                Log.browserDetection.notice("\(browser.name, privacy: .public) query recovered")
+            }
+        case .cancelled:
+            break
+        }
     }
 
     private func meetingTitle(for url: String, platform: String) -> String {
-        if let comp = URLComponents(string: url) {
-            let segs = comp.path.split(separator: "/").map(String.init)
-            if let last = segs.last, !last.isEmpty { return "\(platform) — \(last)" }
+        if let components = URLComponents(string: url) {
+            let segments = components.path.split(separator: "/").map(String.init)
+            if let last = segments.last, !last.isEmpty {
+                return "\(platform) — \(last)"
+            }
         }
         return platform
     }
@@ -177,12 +270,16 @@ final class MeetingDetector {
         guard let url = Bundle.main.url(forResource: "meeting-patterns", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let arr = json["patterns"] as? [[String: Any]]
+              let rawPatterns = json["patterns"] as? [[String: Any]]
         else { return [] }
-        return arr.compactMap { dict in
-            guard let name = dict["name"] as? String,
-                  let raw = dict["regex"] as? String,
-                  let regex = try? NSRegularExpression(pattern: raw, options: [.caseInsensitive])
+
+        return rawPatterns.compactMap { dictionary in
+            guard let name = dictionary["name"] as? String,
+                  let rawRegex = dictionary["regex"] as? String,
+                  let regex = try? NSRegularExpression(
+                    pattern: rawRegex,
+                    options: [.caseInsensitive]
+                  )
             else { return nil }
             return Pattern(name: name, regex: regex)
         }

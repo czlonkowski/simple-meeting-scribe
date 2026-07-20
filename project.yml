@@ -92,3 +92,29 @@ targets:
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: false
         LSUIElement: false
+  MeetingTranscriberTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: MeetingTranscriberTests
+    dependencies:
+      - target: MeetingTranscriber
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.czlonkowski.MeetingTranscriberTests
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: ""
+        CODE_SIGN_ENTITLEMENTS: ""
+schemes:
+  MeetingTranscriber:
+    build:
+      targets:
+        MeetingTranscriber: all
+        MeetingTranscriberTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MeetingTranscriberTests

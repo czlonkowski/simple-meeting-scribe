@@ -114,12 +114,20 @@ final class TranscriptStore {
     }
 
     func loadAll() throws -> [TranscriptDocument] {
+        try Self.decodeAll(at: rootURL)
+    }
+
+    /// Decode the transcript library rooted at `rootURL`. Kept independent of
+    /// the singleton so callers can safely run the filesystem work off-main.
+    static func decodeAll(at rootURL: URL) throws -> [TranscriptDocument] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: rootURL.path) else { return [] }
         let files = try fm.contentsOfDirectory(at: rootURL,
                                                includingPropertiesForKeys: nil,
                                                options: [.skipsHiddenFiles])
-            .filter { $0.pathExtension == "json" }
+            .filter {
+                $0.pathExtension == "json" && $0.lastPathComponent != "tags.json"
+            }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -133,7 +141,7 @@ final class TranscriptStore {
                 NSLog("Skipping malformed transcript \(f.lastPathComponent): \(error)")
             }
         }
-        return docs
+        return docs.sorted { $0.displayDate > $1.displayDate }
     }
 
     func delete(id: String) throws {
