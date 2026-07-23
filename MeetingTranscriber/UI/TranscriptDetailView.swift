@@ -20,6 +20,8 @@ struct TranscriptDetailView: View {
     @State private var transcriptExpanded: Bool = false
     @State private var showDateEditor: Bool = false
     @State private var recordedDraft: Date = Date()
+    @State private var isExportingMixedAudio: Bool = false
+    @State private var mixedAudioWasSaved: Bool = false
     /// Per-summary glossary toggle. Defaults to true whenever any glossary
     /// entry is enabled; resets on each detail-view appearance.
     @State private var useGlossaryThisRun: Bool = true
@@ -102,6 +104,9 @@ struct TranscriptDetailView: View {
             HStack(spacing: 10) {
                 exportButton(for: doc)
                 copyButton(for: doc)
+                if TranscriptStore.shared.audioURL(for: doc) != nil {
+                    mixedAudioExportButton(for: doc)
+                }
             }
             .padding(Theme.space12)
         }
@@ -978,6 +983,88 @@ struct TranscriptDetailView: View {
             try md.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             appState.lastError = "Could not save Markdown: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: – Mixed audio export (save directly to Downloads)
+    private func mixedAudioExportButton(for doc: TranscriptDocument) -> some View {
+        Button {
+            exportMixedAudio(doc)
+        } label: {
+            Group {
+                if isExportingMixedAudio {
+                    HStack(spacing: Theme.space3) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Creating MP3…")
+                    }
+                } else {
+                    Label(
+                        mixedAudioWasSaved ? "Saved to Downloads" : "Download mixed MP3",
+                        systemImage: mixedAudioWasSaved
+                            ? "checkmark.circle.fill"
+                            : "waveform.badge.arrow.down"
+                    )
+                }
+            }
+            .padding(.horizontal, Theme.space4)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .tint(mixedAudioWasSaved ? .green : Theme.accent)
+        .disabled(isExportingMixedAudio)
+        .sensoryFeedback(.success, trigger: mixedAudioWasSaved) { _, new in new }
+        .keyboardShortcut("m", modifiers: [.command, .shift])
+        .help("Mix the microphone and system-audio recordings into one compressed MP3 in Downloads")
+        .accessibilityLabel(
+            isExportingMixedAudio
+                ? "Creating mixed MP3"
+                : mixedAudioWasSaved
+                    ? "Mixed MP3 saved to Downloads"
+                    : "Download mixed MP3"
+        )
+    }
+
+    private func exportMixedAudio(_ doc: TranscriptDocument) {
+        guard let voiceURL = TranscriptStore.shared.audioURL(for: doc) else {
+            appState.lastError = "Could not export audio: the recording is missing."
+            return
+        }
+        guard let downloadsURL = FileManager.default.urls(
+            for: .downloadsDirectory,
+            in: .userDomainMask
+        ).first else {
+            appState.lastError = "Could not find the Downloads folder."
+            return
+        }
+
+        let systemURL = TranscriptStore.shared.systemAudioURL(for: doc)
+        let filenameStem = Self.sanitizeFilename(doc.title) + "-mixed"
+        isExportingMixedAudio = true
+        mixedAudioWasSaved = false
+
+        Task {
+            do {
+                _ = try await Task.detached(priority: .userInitiated) {
+                    try MixedAudioExporter.export(
+                        voiceURL: voiceURL,
+                        systemURL: systemURL,
+                        to: downloadsURL,
+                        filenameStem: filenameStem
+                    )
+                }.value
+                isExportingMixedAudio = false
+                withAnimation(.snappy) {
+                    mixedAudioWasSaved = true
+                }
+                try? await Task.sleep(for: .seconds(2))
+                withAnimation(.snappy) {
+                    mixedAudioWasSaved = false
+                }
+            } catch {
+                isExportingMixedAudio = false
+                appState.lastError = "Could not export mixed audio: \(error.localizedDescription)"
+            }
         }
     }
 

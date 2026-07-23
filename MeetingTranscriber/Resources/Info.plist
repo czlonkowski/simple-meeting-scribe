@@ -37,7 +37,7 @@
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>Meeting Transcriber saves transcripts to your Documents folder.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
-	<string>Needed only if you import files from Downloads.</string>
+	<string>Meeting Transcriber saves mixed audio to and imports media from your Downloads folder.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Romuald Członkowski</string>
 	<key>NSMicrophoneUsageDescription</key>

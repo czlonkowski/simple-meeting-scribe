@@ -48,6 +48,8 @@ downloaded keep working.
 - Xcode 16+ and the Xcode Metal Toolchain (Xcode will prompt on first build,
   or you can pre-install with `xcodebuild -downloadComponent MetalToolchain`).
 - [xcodegen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`.
+- [LAME](https://lame.sourceforge.io/) — `brew install lame` (used only when
+  exporting a mixed meeting recording as MP3).
 - ~15 GB free disk space if you want to cache all the optional models.
 - 32 GB RAM recommended for the larger LLMs (Qwen3.5-9B, Bielik-11B). 16 GB
   works for Qwen3.5-4B and the smaller Bielik variant.
@@ -83,7 +85,7 @@ still need to approve Xcode / Homebrew / sudo prompts as they come up.
 > 1. Verify prerequisites: Apple Silicon, macOS 26 or newer, Xcode 16+
 >    installed. If Xcode Command Line Tools aren't installed, run
 >    `xcode-select --install` and wait for it to finish.
-> 2. Install xcodegen if missing: `brew install xcodegen` (install
+> 2. Install xcodegen and LAME if missing: `brew install xcodegen lame` (install
 >    Homebrew first with the official script if it's not there).
 > 3. Pre-download the Metal Toolchain so the build doesn't stall on it:
 >    `xcodebuild -downloadComponent MetalToolchain`
