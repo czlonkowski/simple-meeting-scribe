@@ -76,6 +76,33 @@ actor StemWriter {
         didWriteSystem = true
     }
 
+    /// Pad the system stem with `seconds` of silence to cover a stretch where
+    /// the capture produced nothing at all — currently only a stream rebuild.
+    ///
+    /// This is not cosmetic. Both stems are append-only and are merged by
+    /// timestamp downstream, so their sample counts *are* the timeline: a
+    /// one-second unpadded gap shifts every later system segment one second
+    /// early, for the rest of the recording. Padding keeps the stems in step.
+    ///
+    /// No-op before any real system audio has been written, so a session that
+    /// never captured system audio doesn't get a file made of pure silence.
+    func padSystem(seconds: TimeInterval) async {
+        guard didWriteSystem, let file = systemFile else { return }
+        let frames = Int((seconds * processingFormat.sampleRate).rounded())
+        // Sub-20 ms gaps are below the transcript's resolution; padding them
+        // adds risk without buying alignment.
+        guard frames > 0, seconds >= 0.02 else { return }
+        Log.systemAudio.notice("padding system stem with \(seconds, format: .fixed(precision: 2), privacy: .public)s of silence")
+
+        let chunk = Int(processingFormat.sampleRate)   // 1 s at a time
+        var remaining = frames
+        while remaining > 0 {
+            let n = min(chunk, remaining)
+            write([Float](repeating: 0, count: n), to: file)
+            remaining -= n
+        }
+    }
+
     private func write(_ samples: [Float], to file: AVAudioFile) {
         guard !samples.isEmpty,
               let buf = AVAudioPCMBuffer(pcmFormat: processingFormat,
@@ -89,7 +116,7 @@ actor StemWriter {
         do {
             try file.write(from: buf)
         } catch {
-            NSLog("StemWriter: write failed — \(error)")
+            Log.recorder.error("stem write failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 

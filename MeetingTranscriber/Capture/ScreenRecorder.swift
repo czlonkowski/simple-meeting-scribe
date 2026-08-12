@@ -52,7 +52,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
                           userInfo: [NSLocalizedDescriptionKey: "No meeting window found."])
         }
         let appName = window.owningApplication?.applicationName ?? "browser"
-        NSLog("ScreenRecorder: capturing \(appName) window \"\(window.title ?? "?")\" (\(Int(window.frame.width))×\(Int(window.frame.height)))")
+        Log.recorder.notice("capturing \(appName, privacy: .public) window \"\(window.title ?? "?", privacy: .public)\" (\(Int(window.frame.width), privacy: .public)×\(Int(window.frame.height), privacy: .public))")
 
         let filter = SCContentFilter(desktopIndependentWindow: window)
 
@@ -85,7 +85,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
         self.recordingOutput = output
         self.outputURL = url
         self.isTearingDown = false
-        NSLog("ScreenRecorder: started → \(url.lastPathComponent) (\(config.width)×\(config.height), \(fileType.rawValue))")
+        Log.recorder.notice("screen recording started → \(url.lastPathComponent, privacy: .public) (\(config.width, privacy: .public)×\(config.height, privacy: .public), \(fileType.rawValue, privacy: .public))")
 
         return StartedRecording(outputURL: url,
                                 startDate: Date(),
@@ -111,7 +111,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
                     group.cancelAll()
                 }
             } catch {
-                NSLog("ScreenRecorder: stopCapture failed/timed out: \(error)")
+                Log.recorder.error("screen stopCapture failed/timed out: \(error.localizedDescription, privacy: .public)")
             }
         }
         stream = nil
@@ -122,7 +122,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
         if await Self.isPlayableVideo(url) {
             return url
         }
-        NSLog("ScreenRecorder: discarding unplayable video file \(url.lastPathComponent)")
+        Log.recorder.error("discarding unplayable video file \(url.lastPathComponent, privacy: .public)")
         try? FileManager.default.removeItem(at: url)
         return nil
     }
@@ -130,13 +130,13 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     // MARK: – Delegates
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        NSLog("ScreenRecorder: stream stopped with error \(error)")
+        Log.recorder.error("screen stream stopped with error \(error.localizedDescription, privacy: .public)")
         guard !isTearingDown else { return }
         onInterrupted?(error)
     }
 
     func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
-        NSLog("ScreenRecorder: recording output failed \(error)")
+        Log.recorder.error("screen recording output failed \(error.localizedDescription, privacy: .public)")
         guard !isTearingDown else { return }
         onInterrupted?(error)
     }

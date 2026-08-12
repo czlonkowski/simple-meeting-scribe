@@ -140,7 +140,7 @@ final class AudioRecorder {
             }
             onInputDeviceChange?()
         } catch {
-            NSLog("AudioRecorder: restart after config change failed: \(error)")
+            Log.recorder.error("restart after config change failed: \(error.localizedDescription, privacy: .public)")
             isRunning = false
         }
     }

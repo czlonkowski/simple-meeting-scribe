@@ -161,6 +161,19 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     var videoFileName: String? = nil      // basename of <base>.video.mp4
     var videoStartOffset: Double? = nil   // seconds video started after the mic stem
 
+    /// Fraction (0...1) of the system stem that was digital silence, measured
+    /// at save time. ScreenCaptureKit can go deaf to one app mid-recording
+    /// without any error, producing a full-length stem of zeros — this is how
+    /// a recording that quietly lost the remote party gets flagged instead of
+    /// being presented as complete. Nil when there was no system stem.
+    var systemAudioSilentFraction: Double? = nil
+
+    /// True when enough of the system stem was silent that the remote side of
+    /// the conversation is probably missing from the transcript.
+    var hasPartialSystemCapture: Bool {
+        (systemAudioSilentFraction ?? 0) >= SystemStemAnalyzer.partialThreshold
+    }
+
     // Summarization (optional — only set once the user runs one).
     var summary: String?
     var summaryModelShortName: String?

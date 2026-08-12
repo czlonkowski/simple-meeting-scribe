@@ -170,6 +170,17 @@ struct TranscriptDetailView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+
+            if doc.hasPartialSystemCapture, let silent = doc.systemAudioSilentFraction {
+                Label {
+                    Text("Partial capture — no system audio for \(Int((silent * 100).rounded()))% of this recording. The other participants are likely missing from parts of the transcript.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

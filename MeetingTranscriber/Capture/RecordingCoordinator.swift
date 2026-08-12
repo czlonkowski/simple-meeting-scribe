@@ -30,7 +30,8 @@ final class RecordingCoordinator {
                onMicLevel: @escaping (Float) -> Void,
                onSystemLevel: @escaping (Float) -> Void,
                onInputDeviceChange: (() -> Void)? = nil,
-               onVideoStatus: ((VideoCaptureStatus) -> Void)? = nil) async throws {
+               onVideoStatus: ((VideoCaptureStatus) -> Void)? = nil,
+               onSystemAudioStatus: ((SystemAudioStatus) -> Void)? = nil) async throws {
         let baseURL = Self.makeBaseURL()
         let writer = try StemWriter(baseURL: baseURL)
         self.writer = writer
@@ -53,10 +54,16 @@ final class RecordingCoordinator {
                 await writer.appendSystem(samples)
             }
             system.onLevel = onSystemLevel
+            // A stream rebuild costs real wall-clock time; pad the stem for it
+            // or every later system segment drifts early against the mic stem.
+            system.onGap = { [weak writer] seconds in
+                await writer?.padSystem(seconds: seconds)
+            }
+            system.onStatus = onSystemAudioStatus
             do {
                 try await system.start(preferredBundleID: "company.thebrowser.Browser")
             } catch {
-                NSLog("System audio capture failed (continuing mic-only): \(error)")
+                Log.systemAudio.error("system audio capture failed (continuing mic-only): \(error.localizedDescription, privacy: .public)")
                 self.captureSystem = false
             }
         }
@@ -79,12 +86,12 @@ final class RecordingCoordinator {
             )
             videoStartOffset = started.startDate.timeIntervalSince(micStartDate)
             screen.onInterrupted = { [weak self] error in
-                NSLog("Screen recording interrupted (audio continues): \(error)")
+                Log.recorder.error("screen recording interrupted (audio continues): \(error.localizedDescription, privacy: .public)")
                 self?.onVideoStatus?(.unavailable(reason: "Window closed"))
             }
             onVideoStatus?(.recording(windowDescription: started.windowDescription))
         } catch {
-            NSLog("Screen recording failed (continuing without video): \(error)")
+            Log.recorder.error("screen recording failed (continuing without video): \(error.localizedDescription, privacy: .public)")
             onVideoStatus?(.unavailable(reason: error.localizedDescription))
         }
     }

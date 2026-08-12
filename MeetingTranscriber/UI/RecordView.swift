@@ -146,6 +146,20 @@ struct RecordView: View {
                 case .off:
                     EmptyView()
                 }
+                if appState.captureSystemAudio {
+                    switch appState.systemAudioStatus {
+                    case .silent(let seconds):
+                        Text("·").foregroundStyle(.tertiary)
+                        Label("No system audio for \(seconds)s", systemImage: "speaker.slash.fill")
+                            .foregroundStyle(.orange)
+                    case .recovering:
+                        Text("·").foregroundStyle(.tertiary)
+                        Label("Restoring system audio", systemImage: "arrow.clockwise")
+                            .foregroundStyle(.orange)
+                    case .ok:
+                        EmptyView()
+                    }
+                }
             }
             .font(.headline)
 

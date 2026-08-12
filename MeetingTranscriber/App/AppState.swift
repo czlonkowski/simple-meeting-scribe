@@ -541,6 +541,10 @@ final class AppState {
     var currentInputDeviceName: String? = nil
     /// Live state of the screen-video capture for the current recording.
     var videoCaptureStatus: VideoCaptureStatus = .off
+    /// Live health of system-audio capture. Surfaced while recording because a
+    /// deaf SCStream is otherwise invisible — it keeps delivering silence at
+    /// full rate and reports no error.
+    var systemAudioStatus: SystemAudioStatus = .ok
 
     // MARK: – Background processing queue
     /// One transcription job — either a freshly captured recording or an
@@ -677,6 +681,7 @@ final class AppState {
         let coord = RecordingCoordinator()
         self.recorder = coord
         videoCaptureStatus = .off
+        systemAudioStatus = .ok
         do {
             try await coord.start(
                 captureSystemAudio: captureSystemAudio,
@@ -695,6 +700,9 @@ final class AppState {
                 },
                 onVideoStatus: { [weak self] status in
                     Task { @MainActor in self?.videoCaptureStatus = status }
+                },
+                onSystemAudioStatus: { [weak self] status in
+                    Task { @MainActor in self?.systemAudioStatus = status }
                 }
             )
             currentInputDeviceName = AudioRecorder.currentInputDeviceName()
@@ -735,6 +743,7 @@ final class AppState {
         do {
             let stems = try await recorder.stop()
             videoCaptureStatus = .off
+            systemAudioStatus = .ok
             let duration = Date().timeIntervalSince(startedAt)
             let job = ProcessingJob(
                 id: UUID(),
@@ -952,6 +961,15 @@ final class AppState {
             if let videoURL {
                 docToSave.videoFileName = videoURL.lastPathComponent
                 docToSave.videoStartOffset = videoStartOffset
+            }
+            // Measure how much of the remote side actually made it into the
+            // recording, so a capture that went deaf is labelled rather than
+            // passed off as a complete meeting. Off the main actor: a
+            // three-hour stem is ~350 MB to scan.
+            if let systemURL {
+                docToSave.systemAudioSilentFraction = await Task.detached(priority: .utility) {
+                    SystemStemAnalyzer.silentFraction(of: systemURL)
+                }.value
             }
             try TranscriptStore.shared.save(docToSave, audioSource: voiceURL)
             await loadTranscripts()
