@@ -59,6 +59,21 @@ private struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                Picker("Preferred microphone", selection: Binding(
+                    get: { state.preferredInputDeviceUID ?? "" },
+                    set: { state.setPreferredInputDeviceUID($0.isEmpty ? nil : $0) }
+                )) {
+                    Text("System Default").tag("")
+                    if !state.availableInputDevices.isEmpty { Divider() }
+                    ForEach(state.availableInputDevices) { device in
+                        Text(device.name).tag(device.uid)
+                    }
+                    if let uid = state.preferredInputDeviceUID, !uid.isEmpty,
+                       !state.availableInputDevices.contains(where: { $0.uid == uid }) {
+                        Divider()
+                        Text("Not connected: \(uid)").tag(uid)
+                    }
+                }
                 Toggle("Include Arc system audio by default", isOn: $state.captureSystemAudio)
                 Toggle("Record meeting screen by default", isOn: Binding(
                     get: { state.recordScreen },
@@ -67,6 +82,10 @@ private struct GeneralSettingsView: View {
             } header: {
                 Text("Capture")
                     .font(Theme.sectionTitleFont)
+            } footer: {
+                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 LabeledContent("Transcripts folder") {

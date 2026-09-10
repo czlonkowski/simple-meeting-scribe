@@ -4,7 +4,7 @@ import SwiftUI
 import AppKit
 
 private let recordScreenKey = "recordScreenByDefault"
-private let inputDeviceUIDKey = "selectedInputDeviceUID"
+private let inputDeviceUIDKey = "preferredInputDeviceUID"
 
 @MainActor
 @Observable
@@ -35,13 +35,29 @@ final class AppState {
         UserDefaults.standard.set(value, forKey: recordScreenKey)
     }
 
-    /// UID of the microphone to record from; nil follows the system default.
-    /// Persisted by UID so the choice survives reboots and re-plugging.
-    var selectedInputDeviceUID: String? = UserDefaults.standard.string(forKey: inputDeviceUIDKey)
+    /// Preferred microphone from Settings; nil follows the system default.
+    /// Used whenever the device is connected. Persisted by UID so the choice
+    /// survives reboots and re-plugging.
+    var preferredInputDeviceUID: String? =
+        UserDefaults.standard.string(forKey: inputDeviceUIDKey)
+        // Key used by the first mic-picker build (2026-09-10); read it once
+        // so an already-chosen mic carries over.
+        ?? UserDefaults.standard.string(forKey: "selectedInputDeviceUID")
 
-    func setSelectedInputDeviceUID(_ uid: String?) {
-        selectedInputDeviceUID = uid
+    func setPreferredInputDeviceUID(_ uid: String?) {
+        preferredInputDeviceUID = uid
         UserDefaults.standard.set(uid, forKey: inputDeviceUIDKey)
+    }
+
+    /// One-off mic chosen on the record card. Lives only for this app run so
+    /// a single swap never rewrites the Settings default.
+    var sessionInputDeviceUID: String? = nil
+
+    /// The mic the next recording will open (before the "is it connected"
+    /// fallback inside AudioRecorder).
+    var effectiveInputDeviceUID: String? {
+        InputDeviceSelection.effectiveUID(sessionOverride: sessionInputDeviceUID,
+                                          preferred: preferredInputDeviceUID)
     }
 
     /// Attached input devices for the mic picker. Refreshed by
@@ -712,7 +728,7 @@ final class AppState {
                 captureSystemAudio: captureSystemAudio,
                 recordScreen: recordScreen,
                 meeting: meeting,
-                inputDeviceUID: selectedInputDeviceUID,
+                inputDeviceUID: effectiveInputDeviceUID,
                 onMicLevel: { [weak self] rms in
                     Task { @MainActor in self?.currentMicRMS = rms }
                 },

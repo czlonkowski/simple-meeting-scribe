@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0FD9E14CF2C87AC7A4AF2136 /* MixedAudioExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7F2B018F13905073BE6C30 /* MixedAudioExporterTests.swift */; };
 		113CA20A70CB3CA14CF23E71 /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 293C7021B9086A3D9C1B53C9 /* MCP */; };
+		16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */; };
 		1720D07E50CB1A0EBFF74B70 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 022F5C4E781FD3B3C2A72941 /* Tokenizers */; };
 		21DAC638DE2E4DE0D4C20FEC /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B9C8A0387E7A87C2517C2A /* Log.swift */; };
 		22CDE25A5568BCEAD5BA787B /* SystemAudioHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C68BE6DFD8EB0621B47265 /* SystemAudioHealth.swift */; };
@@ -128,6 +129,7 @@
 		9580D9A82FEF7CAA918C1603 /* meeting-patterns.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "meeting-patterns.json"; sourceTree = "<group>"; };
 		9B051221F75C91039F1F7951 /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
 		A31CAE064B962477AD977CB2 /* BrowserURLQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserURLQuery.swift; sourceTree = "<group>"; };
+		A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDevicePreferenceTests.swift; sourceTree = "<group>"; };
 		A695BDA0BDC7F7DA22A91CEB /* MeetingJoinSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingJoinSheet.swift; sourceTree = "<group>"; };
 		A9CAE8E9C764D6CDA49107B1 /* DictionaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryStore.swift; sourceTree = "<group>"; };
 		A9DF34BD84516093E582B6AD /* ImportFileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFileSheet.swift; sourceTree = "<group>"; };
@@ -253,6 +255,7 @@
 		ACD37D8B6CD48EA3DF24C6EA /* MeetingTranscriberTests */ = {
 			isa = PBXGroup;
 			children = (
+				A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */,
 				D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */,
 				398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */,
 				AFFC6E02D883DDE51789ACAE /* MeetingDetectorTests.swift */,
@@ -454,6 +457,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */,
 				B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */,
 				A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */,
 				F8FE95679B863CFC10AB44BB /* MeetingDetectorTests.swift in Sources */,

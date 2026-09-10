@@ -305,7 +305,7 @@ struct RecordView: View {
     private var micPicker: some View {
         Menu {
             Picker("Microphone", selection: inputDeviceBinding) {
-                Text("System Default").tag("")
+                Text(defaultMicLabel).tag("")
                 if !appState.availableInputDevices.isEmpty { Divider() }
                 ForEach(appState.availableInputDevices) { device in
                     Text(device.name).tag(device.uid)
@@ -326,12 +326,19 @@ struct RecordView: View {
         .buttonStyle(.glass)
         .controlSize(.large)
         .fixedSize()
-        .help("Microphone to record from. Overrides the system default input.")
+        .help("Microphone for this session only. Set the default in Settings.")
     }
 
+    /// Button title: the session override when set, else what "default"
+    /// resolves to right now (preferred mic if connected, or the system one).
     private var selectedInputDeviceName: String {
-        guard let uid = appState.selectedInputDeviceUID, !uid.isEmpty else { return "System Default" }
+        guard let uid = appState.sessionInputDeviceUID, !uid.isEmpty else { return defaultMicLabel }
         return appState.availableInputDevices.first { $0.uid == uid }?.name ?? "Unavailable mic"
+    }
+
+    private var defaultMicLabel: String {
+        InputDeviceSelection.defaultLabel(preferred: appState.preferredInputDeviceUID,
+                                          available: appState.availableInputDevices)
     }
 
     @ViewBuilder
@@ -376,12 +383,12 @@ struct RecordView: View {
         }
     }
 
-    /// Empty string stands for "follow the system default" so the picker has
-    /// a non-optional tag type.
+    /// Session-only override. Empty string stands for "use the default" so
+    /// the picker has a non-optional tag type.
     private var inputDeviceBinding: Binding<String> {
         Binding(
-            get: { appState.selectedInputDeviceUID ?? "" },
-            set: { appState.setSelectedInputDeviceUID($0.isEmpty ? nil : $0) }
+            get: { appState.sessionInputDeviceUID ?? "" },
+            set: { appState.sessionInputDeviceUID = $0.isEmpty ? nil : $0 }
         )
     }
 
@@ -389,7 +396,7 @@ struct RecordView: View {
     /// so the picker still shows *something* selected instead of going blank;
     /// recording falls back to the system default until it reappears.
     private var staleInputDeviceUID: String? {
-        guard let uid = appState.selectedInputDeviceUID, !uid.isEmpty,
+        guard let uid = appState.sessionInputDeviceUID, !uid.isEmpty,
               !appState.availableInputDevices.contains(where: { $0.uid == uid }) else { return nil }
         return uid
     }

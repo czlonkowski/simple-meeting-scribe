@@ -18,4 +18,23 @@ enum InputDeviceSelection {
         guard let uid = preferredUID, !uid.isEmpty else { return nil }
         return available.first { $0.uid == uid }
     }
+
+    /// UID to record from: the session override from the record card when
+    /// set, else the persisted preference from Settings. Empty strings count
+    /// as unset. Nil means follow the system default.
+    static func effectiveUID(sessionOverride: String?, preferred: String?) -> String? {
+        if let uid = sessionOverride, !uid.isEmpty { return uid }
+        if let uid = preferred, !uid.isEmpty { return uid }
+        return nil
+    }
+
+    /// Title of the record card's first menu item: names the preferred mic
+    /// when it is connected so the user can see what "default" will resolve
+    /// to, else the plain system default.
+    static func defaultLabel(preferred: String?, available: [InputDevice]) -> String {
+        if let device = resolve(preferredUID: preferred, available: available) {
+            return "Default (\(device.name))"
+        }
+        return "System Default"
+    }
 }
