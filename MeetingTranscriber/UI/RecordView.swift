@@ -236,11 +236,44 @@ struct RecordView: View {
     // MARK: – Controls
     @ViewBuilder
     private var controls: some View {
+        switch appState.recordingState {
+        case .idle:
+            idleControls
+        case .recording:
+            recordingControls
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Two rows: what to capture (mic, system audio, screen), then how to
+    /// transcribe it and the start button. Every label is `fixedSize` so a
+    /// long device name can never wrap the toggles into a column.
+    private var idleControls: some View {
         @Bindable var state = appState
 
-        HStack(spacing: Theme.space8) {
-            switch appState.recordingState {
-            case .idle:
+        return VStack(alignment: .leading, spacing: Theme.space6) {
+            HStack(spacing: Theme.space8) {
+                micPicker
+
+                Toggle(isOn: $state.captureSystemAudio) {
+                    Label("System audio", systemImage: "speaker.wave.2.fill")
+                        .fixedSize()
+                }
+                .toggleStyle(.switch)
+                .help("Also record what you hear from the meeting")
+
+                Toggle(isOn: recordScreenBinding) {
+                    Label("Screen", systemImage: "video.fill")
+                        .fixedSize()
+                }
+                .toggleStyle(.switch)
+                .help("Record the meeting's browser window as video")
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: Theme.space8) {
                 Picker("Language", selection: $state.defaultLanguage) {
                     ForEach(TranscriptionLanguage.allCases) { l in
                         Text("\(l.flag) \(l.displayName)").tag(l)
@@ -250,88 +283,96 @@ struct RecordView: View {
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 220)
 
-                Picker(selection: inputDeviceBinding) {
-                    Text("System Default").tag("")
-                    if !appState.availableInputDevices.isEmpty { Divider() }
-                    ForEach(appState.availableInputDevices) { device in
-                        Text(device.name).tag(device.uid)
-                    }
-                    if let stale = staleInputDeviceUID {
-                        Divider()
-                        Text("Unavailable (\(stale))").tag(stale)
-                    }
-                } label: {
-                    Label("Mic", systemImage: "mic.fill")
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 240)
-                .help("Microphone to record from. Overrides the system default input.")
-
-                Toggle(isOn: $state.captureSystemAudio) {
-                    Label("Include system audio", systemImage: "speaker.wave.2.fill")
-                }
-                .toggleStyle(.switch)
-
-                Toggle(isOn: recordScreenBinding) {
-                    Label("Record screen", systemImage: "video.fill")
-                }
-                .toggleStyle(.switch)
-                .help("Record the meeting's browser window as video")
-
-                Spacer()
+                Spacer(minLength: Theme.space8)
 
                 Button {
                     Task { await appState.startRecording(language: appState.defaultLanguage, meeting: nil) }
                 } label: {
                     Label("Start Recording", systemImage: "record.circle.fill")
+                        .fixedSize()
                         .padding(.horizontal, Theme.space3)
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)
                 .tint(Theme.accent)
                 .keyboardShortcut("r", modifiers: [.command, .shift])
+            }
+        }
+    }
 
-            case .recording:
+    /// Mic source as one menu button: icon + selected device name, matching
+    /// the toggles beside it. The picker inside renders as a radio list.
+    private var micPicker: some View {
+        Menu {
+            Picker("Microphone", selection: inputDeviceBinding) {
+                Text("System Default").tag("")
+                if !appState.availableInputDevices.isEmpty { Divider() }
+                ForEach(appState.availableInputDevices) { device in
+                    Text(device.name).tag(device.uid)
+                }
+                if let stale = staleInputDeviceUID {
+                    Divider()
+                    Text("Unavailable: \(stale)").tag(stale)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            Label(selectedInputDeviceName, systemImage: "mic.fill")
+                .lineLimit(1)
+                .frame(maxWidth: 240)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.glass)
+        .controlSize(.large)
+        .fixedSize()
+        .help("Microphone to record from. Overrides the system default input.")
+    }
+
+    private var selectedInputDeviceName: String {
+        guard let uid = appState.selectedInputDeviceUID, !uid.isEmpty else { return "System Default" }
+        return appState.availableInputDevices.first { $0.uid == uid }?.name ?? "Unavailable mic"
+    }
+
+    @ViewBuilder
+    private var recordingControls: some View {
+        HStack(spacing: Theme.space8) {
+            Button {
+                appState.setMicMuted(!appState.isMicMuted)
+            } label: {
+                Label(appState.isMicMuted ? "Unmute" : "Mute mic",
+                      systemImage: appState.isMicMuted ? "mic.slash.fill" : "mic.fill")
+            }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+
+            // Turn on screen recording mid-meeting. Hidden once video is
+            // rolling; .unavailable keeps it visible so a retry is one
+            // click away (e.g. after opening the meeting window).
+            if !videoIsRecording {
                 Button {
-                    appState.setMicMuted(!appState.isMicMuted)
+                    Task { await appState.startScreenCaptureNow() }
                 } label: {
-                    Label(appState.isMicMuted ? "Unmute" : "Mute mic",
-                          systemImage: appState.isMicMuted ? "mic.slash.fill" : "mic.fill")
+                    Label("Record screen", systemImage: "video.fill")
                 }
                 .buttonStyle(.glass)
                 .controlSize(.large)
-                .keyboardShortcut("m", modifiers: [.command, .shift])
-
-                // Turn on screen recording mid-meeting. Hidden once video is
-                // rolling; .unavailable keeps it visible so a retry is one
-                // click away (e.g. after opening the meeting window).
-                if !videoIsRecording {
-                    Button {
-                        Task { await appState.startScreenCaptureNow() }
-                    } label: {
-                        Label("Record screen", systemImage: "video.fill")
-                    }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-                    .help("Start recording the meeting window now")
-                }
-
-                Spacer()
-
-                Button {
-                    Task { await appState.stopRecording() }
-                } label: {
-                    Label("Stop", systemImage: "stop.circle.fill")
-                        .padding(.horizontal, Theme.space3)
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.extraLarge)
-                .tint(Theme.accent)
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-
-            default:
-                EmptyView()
+                .help("Start recording the meeting window now")
             }
+
+            Spacer()
+
+            Button {
+                Task { await appState.stopRecording() }
+            } label: {
+                Label("Stop", systemImage: "stop.circle.fill")
+                    .padding(.horizontal, Theme.space3)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.extraLarge)
+            .tint(Theme.accent)
+            .keyboardShortcut("r", modifiers: [.command, .shift])
         }
     }
 
