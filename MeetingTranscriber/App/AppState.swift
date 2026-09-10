@@ -619,6 +619,7 @@ final class AppState {
     private var detector: MeetingDetector?
     private var recorder: RecordingCoordinator?
     private var elapsedTimer: Timer?
+    private var longRecordingAlert = LongRecordingAlert()
     private var didBootstrap = false
 
     // MARK: – Bootstrap
@@ -709,6 +710,8 @@ final class AppState {
             let start = Date()
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0
+            longRecordingAlert = LongRecordingAlert()
+            LongRecordingNotifier.shared.prepare()
             startElapsedTimer(from: start)
             if let url = meeting?.url { dismissedMeetingURLs.insert(url) }
             detectedMeeting = nil
@@ -778,6 +781,9 @@ final class AppState {
                 guard let self else { return }
                 if self.recordingState.isRecording {
                     self.elapsedSeconds = Int(Date().timeIntervalSince(start))
+                    if self.longRecordingAlert.check(elapsedSeconds: self.elapsedSeconds) {
+                        LongRecordingNotifier.shared.postLongRecordingNotice(elapsedSeconds: self.elapsedSeconds)
+                    }
                 }
             }
         }
