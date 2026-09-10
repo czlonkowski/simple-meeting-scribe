@@ -250,6 +250,23 @@ struct RecordView: View {
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 220)
 
+                Picker(selection: inputDeviceBinding) {
+                    Text("System Default").tag("")
+                    if !appState.availableInputDevices.isEmpty { Divider() }
+                    ForEach(appState.availableInputDevices) { device in
+                        Text(device.name).tag(device.uid)
+                    }
+                    if let stale = staleInputDeviceUID {
+                        Divider()
+                        Text("Unavailable (\(stale))").tag(stale)
+                    }
+                } label: {
+                    Label("Mic", systemImage: "mic.fill")
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 240)
+                .help("Microphone to record from. Overrides the system default input.")
+
                 Toggle(isOn: $state.captureSystemAudio) {
                     Label("Include system audio", systemImage: "speaker.wave.2.fill")
                 }
@@ -316,6 +333,24 @@ struct RecordView: View {
                 EmptyView()
             }
         }
+    }
+
+    /// Empty string stands for "follow the system default" so the picker has
+    /// a non-optional tag type.
+    private var inputDeviceBinding: Binding<String> {
+        Binding(
+            get: { appState.selectedInputDeviceUID ?? "" },
+            set: { appState.setSelectedInputDeviceUID($0.isEmpty ? nil : $0) }
+        )
+    }
+
+    /// A saved UID whose device is not attached right now. Kept in the menu
+    /// so the picker still shows *something* selected instead of going blank;
+    /// recording falls back to the system default until it reappears.
+    private var staleInputDeviceUID: String? {
+        guard let uid = appState.selectedInputDeviceUID, !uid.isEmpty,
+              !appState.availableInputDevices.contains(where: { $0.uid == uid }) else { return nil }
+        return uid
     }
 
     private var recordScreenBinding: Binding<Bool> {

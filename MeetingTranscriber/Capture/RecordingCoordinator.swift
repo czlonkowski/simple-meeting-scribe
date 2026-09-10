@@ -27,6 +27,7 @@ final class RecordingCoordinator {
     func start(captureSystemAudio: Bool,
                recordScreen: Bool,
                meeting: DetectedMeeting?,
+               inputDeviceUID: String? = nil,
                onMicLevel: @escaping (Float) -> Void,
                onSystemLevel: @escaping (Float) -> Void,
                onInputDeviceChange: (() -> Void)? = nil,
@@ -45,6 +46,7 @@ final class RecordingCoordinator {
         }
         mic.onLevel = onMicLevel
         mic.onInputDeviceChange = onInputDeviceChange
+        mic.preferredDeviceUID = inputDeviceUID
         try mic.start()
         micStartDate = Date()
 
@@ -94,6 +96,11 @@ final class RecordingCoordinator {
             Log.recorder.error("screen recording failed (continuing without video): \(error.localizedDescription, privacy: .public)")
             onVideoStatus?(.unavailable(reason: error.localizedDescription))
         }
+    }
+
+    /// Name of the microphone actually feeding the mic stem.
+    func activeInputDeviceName() -> String? {
+        mic.activeInputDeviceName()
     }
 
     func setMicMuted(_ muted: Bool) {

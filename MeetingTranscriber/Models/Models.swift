@@ -26,6 +26,9 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
     // Using quantized 632MB/626MB variants for fast downloads (negligible WER diff).
     case largeV3Turbo = "large-v3-v20240930_turbo_632MB"
     case largeV3      = "large-v3-v20240930_626MB"
+    // Local, but not WhisperKit: NVIDIA Parakeet TDT 0.6B v3 via FluidAudio
+    // (Core ML, Apple Neural Engine). Routed to `ParakeetEngine`.
+    case parakeetV3   = "parakeet-tdt-0.6b-v3"
     // Cloud engine — not a WhisperKit folder; must never reach WhisperEngine.
     case scribeV2     = "elevenlabs-scribe-v2"
 
@@ -34,6 +37,7 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .largeV3Turbo: return "Whisper Large v3 Turbo (fast, ~632 MB)"
         case .largeV3:      return "Whisper Large v3 (best quality, ~626 MB)"
+        case .parakeetV3:   return "Parakeet v3 (fastest, Neural Engine, ~600 MB)"
         case .scribeV2:     return "ElevenLabs Scribe v2 (cloud)"
         }
     }
@@ -41,6 +45,7 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .largeV3Turbo: return "large-v3-turbo"
         case .largeV3:      return "large-v3"
+        case .parakeetV3:   return "parakeet-v3"
         case .scribeV2:     return "scribe-v2"
         }
     }
@@ -49,11 +54,14 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         switch self {
         case .largeV3Turbo: return "Turbo"
         case .largeV3:      return "Large"
+        case .parakeetV3:   return "Parakeet"
         case .scribeV2:     return "Scribe"
         }
     }
     /// Cloud models are routed to `ScribeEngine`; local ones to `WhisperEngine`.
     var isCloud: Bool { self == .scribeV2 }
+    /// Local non-Whisper model handled by `ParakeetEngine`.
+    var isParakeet: Bool { self == .parakeetV3 }
 }
 
 struct DetectedMeeting: Equatable, Hashable, Identifiable {

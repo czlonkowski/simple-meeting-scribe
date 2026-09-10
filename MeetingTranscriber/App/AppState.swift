@@ -4,6 +4,7 @@ import SwiftUI
 import AppKit
 
 private let recordScreenKey = "recordScreenByDefault"
+private let inputDeviceUIDKey = "selectedInputDeviceUID"
 
 @MainActor
 @Observable
@@ -12,7 +13,13 @@ final class AppState {
 
     init() {
         Self.shared = self
+        refreshInputDevices()
+        deviceListObserver = AudioRecorder.observeDeviceListChanges { [weak self] in
+            self?.refreshInputDevices()
+        }
     }
+
+    private var deviceListObserver: AnyObject?
 
     // MARK: – Settings
     var selectedModel: WhisperModel = .largeV3Turbo
@@ -26,6 +33,23 @@ final class AppState {
     func setRecordScreen(_ value: Bool) {
         recordScreen = value
         UserDefaults.standard.set(value, forKey: recordScreenKey)
+    }
+
+    /// UID of the microphone to record from; nil follows the system default.
+    /// Persisted by UID so the choice survives reboots and re-plugging.
+    var selectedInputDeviceUID: String? = UserDefaults.standard.string(forKey: inputDeviceUIDKey)
+
+    func setSelectedInputDeviceUID(_ uid: String?) {
+        selectedInputDeviceUID = uid
+        UserDefaults.standard.set(uid, forKey: inputDeviceUIDKey)
+    }
+
+    /// Attached input devices for the mic picker. Refreshed by
+    /// `refreshInputDevices()` and by the CoreAudio device-list listener.
+    var availableInputDevices: [InputDevice] = []
+
+    func refreshInputDevices() {
+        availableInputDevices = AudioRecorder.availableInputDevices()
     }
 
     /// ElevenLabs API key for Scribe v2 (persisted in the macOS Keychain).
@@ -688,15 +712,16 @@ final class AppState {
                 captureSystemAudio: captureSystemAudio,
                 recordScreen: recordScreen,
                 meeting: meeting,
+                inputDeviceUID: selectedInputDeviceUID,
                 onMicLevel: { [weak self] rms in
                     Task { @MainActor in self?.currentMicRMS = rms }
                 },
                 onSystemLevel: { [weak self] rms in
                     Task { @MainActor in self?.currentSystemRMS = rms }
                 },
-                onInputDeviceChange: { [weak self] in
+                onInputDeviceChange: { [weak self, weak coord] in
                     Task { @MainActor in
-                        self?.currentInputDeviceName = AudioRecorder.currentInputDeviceName()
+                        self?.currentInputDeviceName = coord?.activeInputDeviceName()
                     }
                 },
                 onVideoStatus: { [weak self] status in
@@ -706,7 +731,7 @@ final class AppState {
                     Task { @MainActor in self?.systemAudioStatus = status }
                 }
             )
-            currentInputDeviceName = AudioRecorder.currentInputDeviceName()
+            currentInputDeviceName = coord.activeInputDeviceName()
             let start = Date()
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0

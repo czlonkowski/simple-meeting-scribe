@@ -12,6 +12,7 @@ enum Log {
 
     static let pipeline      = Logger(subsystem: subsystem, category: "pipeline")
     static let whisper       = Logger(subsystem: subsystem, category: "whisper")
+    static let parakeet      = Logger(subsystem: subsystem, category: "parakeet")
     static let recorder      = Logger(subsystem: subsystem, category: "recorder")
     static let systemAudio   = Logger(subsystem: subsystem, category: "systemAudio")
     static let summary       = Logger(subsystem: subsystem, category: "summary")

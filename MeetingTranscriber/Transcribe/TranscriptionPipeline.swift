@@ -8,6 +8,7 @@ final class TranscriptionPipeline {
     private let whisper = WhisperEngine()
     private let diarizer = DiarizationEngine()
     private let scribe = ScribeEngine()
+    private let parakeet = ParakeetEngine()
 
     func run(voiceURL: URL,
              systemURL: URL?,
@@ -88,14 +89,27 @@ final class TranscriptionPipeline {
             var voiceSegs: [WhisperSegment] = []
             var systemSegs: [WhisperSegment] = []
             var systemDiar: [DiarizedSegment] = []
+            if model.isParakeet, let text = initialPrompt?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+                Log.pipeline.notice("parakeet has no prompt input; ignoring prime: \(text, privacy: .public)")
+            }
+            // Local engines share one signature so both stems route the same way.
+            func transcribeLocal(_ url: URL,
+                                 progress p: @escaping (Double, String) -> Void) async throws -> [WhisperSegment] {
+                if model.isParakeet {
+                    return try await parakeet.transcribe(url: url, progress: p)
+                }
+                return try await whisper.transcribe(url: url,
+                                                    language: language,
+                                                    model: model,
+                                                    initialPrompt: initialPrompt,
+                                                    progress: p)
+            }
+
             // ----- Voice stem (mic) -----
             progress(0.05, "Transcribing your voice")
             do {
-                voiceSegs = try await whisper.transcribe(
-                    url: voiceURL,
-                    language: language,
-                    model: model,
-                    initialPrompt: initialPrompt,
+                voiceSegs = try await transcribeLocal(
+                    voiceURL,
                     progress: { p, s in progress(0.05 + p * 0.30, s) }
                 )
                 Log.pipeline.notice("voice produced \(voiceSegs.count, privacy: .public) segments")
@@ -108,11 +122,8 @@ final class TranscriptionPipeline {
             if let systemURL = systemURL {
                 progress(0.40, "Transcribing system audio")
                 do {
-                    systemSegs = try await whisper.transcribe(
-                        url: systemURL,
-                        language: language,
-                        model: model,
-                        initialPrompt: initialPrompt,
+                    systemSegs = try await transcribeLocal(
+                        systemURL,
                         progress: { p, s in progress(0.40 + p * 0.30, s) }
                     )
                     Log.pipeline.notice("system produced \(systemSegs.count, privacy: .public) segments")

@@ -33,6 +33,11 @@ final class AudioRecorder {
     /// use this to re-read `AudioRecorder.currentInputDeviceName()`.
     var onInputDeviceChange: (() -> Void)?
 
+    /// UID of the device to capture from; nil follows the system default.
+    /// Set before `start()`. A UID that is not currently attached is ignored
+    /// (logged) so a stale preference never blocks recording.
+    var preferredDeviceUID: String?
+
     func start() throws {
         guard !isRunning else { return }
         try setupEngineAndTap()
@@ -65,6 +70,7 @@ final class AudioRecorder {
 
     private func setupEngineAndTap() throws {
         let input = engine.inputNode
+        applyPreferredDevice(to: input)
         let hwFormat = input.inputFormat(forBus: 0)
         guard hwFormat.sampleRate > 0, hwFormat.channelCount > 0 else {
             throw NSError(domain: "AudioRecorder", code: 1,
@@ -145,6 +151,144 @@ final class AudioRecorder {
         }
     }
 
+    // MARK: – Device selection
+
+    /// Points the input node's underlying HAL unit at the preferred device.
+    /// Must run before the first `inputFormat(forBus:)` query, which is what
+    /// makes AVAudioEngine instantiate the unit for the chosen device.
+    private func applyPreferredDevice(to input: AVAudioInputNode) {
+        let available = Self.availableInputDevices()
+        guard let device = InputDeviceSelection.resolve(preferredUID: preferredDeviceUID,
+                                                        available: available) else {
+            if let uid = preferredDeviceUID, !uid.isEmpty {
+                Log.recorder.notice("preferred input \(uid, privacy: .public) not attached; using system default")
+            }
+            return
+        }
+        guard let unit = input.audioUnit else {
+            Log.recorder.error("input node has no audio unit; cannot select \(device.name, privacy: .public)")
+            return
+        }
+        var deviceID = device.id
+        let status = AudioUnitSetProperty(unit,
+                                          kAudioOutputUnitProperty_CurrentDevice,
+                                          kAudioUnitScope_Global, 0,
+                                          &deviceID,
+                                          UInt32(MemoryLayout<AudioDeviceID>.size))
+        if status == noErr {
+            Log.recorder.notice("capturing from \(device.name, privacy: .public)")
+        } else {
+            Log.recorder.error("selecting \(device.name, privacy: .public) failed (OSStatus \(status, privacy: .public)); using system default")
+        }
+    }
+
+    /// Name of the device this recorder is actually capturing from: the
+    /// preferred device when it was applied, else the system default.
+    func activeInputDeviceName() -> String? {
+        if let unit = engine.inputNode.audioUnit {
+            var deviceID = AudioDeviceID(0)
+            var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+            let status = AudioUnitGetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                                              kAudioUnitScope_Global, 0, &deviceID, &size)
+            if status == noErr, deviceID != 0, let name = Self.deviceName(deviceID) {
+                return name
+            }
+        }
+        return Self.currentInputDeviceName()
+    }
+
+    /// Calls `handler` on the main queue whenever CoreAudio's device list
+    /// changes (plug/unplug, Bluetooth connect). Returns a token; keep it
+    /// alive for as long as the observation should run.
+    static func observeDeviceListChanges(_ handler: @escaping () -> Void) -> AnyObject {
+        let addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let observer = DeviceListObserver(address: addr) { handler() }
+        return observer
+    }
+
+    private final class DeviceListObserver {
+        private var address: AudioObjectPropertyAddress
+        private let block: AudioObjectPropertyListenerBlock
+
+        init(address: AudioObjectPropertyAddress, handler: @escaping () -> Void) {
+            self.address = address
+            self.block = { _, _ in handler() }
+            AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject),
+                                                &self.address, .main, block)
+        }
+
+        deinit {
+            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject),
+                                                   &address, .main, block)
+        }
+    }
+
+    /// Every attached device with at least one input channel, in HAL order.
+    static func availableInputDevices() -> [InputDevice] {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject),
+                                             &addr, 0, nil, &size) == noErr else { return [] }
+        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+        var ids = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                         &addr, 0, nil, &size, &ids) == noErr else { return [] }
+
+        return ids.compactMap { id in
+            guard inputChannelCount(id) > 0,
+                  let uid = deviceUID(id),
+                  let name = deviceName(id) else { return nil }
+            return InputDevice(id: id, uid: uid, name: name)
+        }
+    }
+
+    private static func inputChannelCount(_ id: AudioDeviceID) -> Int {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &addr, 0, nil, &size) == noErr, size > 0 else { return 0 }
+        let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size),
+                                                   alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, raw) == noErr else { return 0 }
+        let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+        return list.reduce(0) { $0 + Int($1.mNumberChannels) }
+    }
+
+    private static func deviceUID(_ id: AudioDeviceID) -> String? {
+        stringProperty(id, selector: kAudioDevicePropertyDeviceUID)
+    }
+
+    private static func deviceName(_ id: AudioDeviceID) -> String? {
+        stringProperty(id, selector: kAudioObjectPropertyName)
+    }
+
+    private static func stringProperty(_ id: AudioDeviceID,
+                                       selector: AudioObjectPropertySelector) -> String? {
+        // CoreAudio hands back a retained CFString; Unmanaged keeps ARC honest.
+        var ref: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var addr = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &ref)
+        guard status == noErr, let value = ref?.takeRetainedValue() else { return nil }
+        return value as String
+    }
+
     /// Human-readable name of the system default input device
     /// (e.g. "MacBook Pro Microphone", "AirPods Pro"). Returns nil if
     /// CoreAudio can't resolve it.
@@ -156,19 +300,11 @@ final class AudioRecorder {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var status = AudioObjectGetPropertyData(
+        let status = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
             &addr, 0, nil, &size, &deviceID
         )
         guard status == noErr, deviceID != 0 else { return nil }
-
-        // kAudioObjectPropertyName returns a retained CFString; use Unmanaged
-        // so ARC doesn't mishandle the reference CoreAudio hands back.
-        var nameRef: Unmanaged<CFString>?
-        size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-        addr.mSelector = kAudioObjectPropertyName
-        status = AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &nameRef)
-        guard status == noErr, let name = nameRef?.takeRetainedValue() else { return nil }
-        return name as String
+        return deviceName(deviceID)
     }
 }
