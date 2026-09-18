@@ -198,7 +198,7 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     var summaryGeneratedAt: Date?
     // Per-meeting override for the summarization model. nil = use the
     // language default from Settings.
-    var summaryModelOverride: LanguageModel?
+    var summaryModelOverride: SummaryModel?
 
     /// Date to display and sort by: the real recording date when known,
     /// otherwise the transcription date.
@@ -213,7 +213,9 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
 extension TranscriptDocument {
     /// Custom decoder that tolerates a `summaryModelOverride` referring to a
     /// model that no longer exists (e.g. a removed Bielik repo ID): it decodes
-    /// to `nil` rather than throwing, so old transcripts still load. All other
+    /// to `nil` rather than throwing, so old transcripts still load. An Azure
+    /// override decodes even after its deployment is removed from Settings;
+    /// summarizing then asks for another model. All other
     /// fields decode exactly as the synthesized initializer would.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -237,6 +239,6 @@ extension TranscriptDocument {
         summaryGeneratedAt = try c.decodeIfPresent(Date.self, forKey: .summaryGeneratedAt)
         // Lenient: present-but-unknown rawValue throws inside decodeIfPresent,
         // which `try?` turns into nil; absent key also yields nil.
-        summaryModelOverride = (try? c.decodeIfPresent(LanguageModel.self, forKey: .summaryModelOverride)) ?? nil
+        summaryModelOverride = (try? c.decodeIfPresent(SummaryModel.self, forKey: .summaryModelOverride)) ?? nil
     }
 }

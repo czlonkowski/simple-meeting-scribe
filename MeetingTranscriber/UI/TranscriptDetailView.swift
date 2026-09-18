@@ -486,7 +486,7 @@ struct TranscriptDetailView: View {
                     }
                     .buttonStyle(.glassProminent)
                     .controlSize(.large)
-                    .help("Generate a local LLM summary for this transcript")
+                    .help("Generate a summary with the model chosen below")
 
                     Button {
                         showingCustomPromptPopover = true
@@ -517,38 +517,39 @@ struct TranscriptDetailView: View {
         }
     }
 
-    /// Per-meeting LLM picker. Defaults to the Settings model for the
-    /// transcript's language; selecting a non-default model persists the choice
-    /// on the document. Both the summary pass and the title pass use it.
+    /// Per-meeting LLM picker: local MLX models, then the Azure deployments
+    /// from Settings. Defaults to the Settings model for the transcript's
+    /// language; selecting a non-default model persists the choice on the
+    /// document. Every pass of the run (speakers, summary, title) uses it.
     @ViewBuilder
     private func summaryModelMenu(for doc: TranscriptDocument) -> some View {
-        let language = doc.language
-        let langDefault: LanguageModel = (language == .polish)
-            ? appState.defaultModelPolish
-            : appState.defaultModelEnglish
+        let langDefault = appState.defaultSummaryModel(for: doc.language)
         let effective = doc.summaryModelOverride ?? langDefault
-        // Per-meeting override is explicit user intent — list every model.
-        // The Settings defaults are still filtered by supportedLanguages.
-        let allModels = LanguageModel.allCases
+        let isAzure = if case .azure = effective { true } else { false }
 
         Menu {
-            ForEach(allModels) { m in
-                Button {
-                    appState.setSummaryModelOverride(
-                        m == langDefault ? nil : m,
-                        for: documentID
-                    )
-                } label: {
-                    HStack {
-                        if m == effective {
-                            Image(systemName: "checkmark")
-                        }
-                        Text(m.displayName)
+            // Per-meeting override is explicit user intent — list every model.
+            // The Settings defaults are still filtered by supportedLanguages.
+            Section("On this Mac") {
+                ForEach(LanguageModel.allCases) { m in
+                    summaryModelButton(.local(m), effective: effective, langDefault: langDefault) {
                         if !appState.downloadedModelIDs.contains(m.repoID) {
                             Text("· downloads on first use")
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+            }
+            Section("Azure OpenAI") {
+                ForEach(appState.azureDeployments) { d in
+                    summaryModelButton(.azure(d.id), effective: effective, langDefault: langDefault) {
+                        EmptyView()
+                    }
+                }
+                SettingsLink {
+                    Text(appState.azureDeployments.isEmpty
+                         ? "Add Azure Deployment…"
+                         : "Manage Azure Deployments…")
                 }
             }
             if doc.summaryModelOverride != nil {
@@ -558,14 +559,35 @@ struct TranscriptDetailView: View {
                 }
             }
         } label: {
-            Label(effective.shortName, systemImage: "cpu")
+            Label(appState.shortName(for: effective), systemImage: isAzure ? "cloud" : "cpu")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
         .chipHover()
-        .help("Choose the LLM used for the summary and title. Defaults to the Settings model for this language.")
+        .help(isAzure
+              ? "Summarizing with an Azure OpenAI deployment — the transcript is sent to your Azure resource. Choose the LLM for the summary and title."
+              : "Choose the LLM used for the summary and title. Defaults to the Settings model for this language.")
+    }
+
+    private func summaryModelButton<Detail: View>(
+        _ model: SummaryModel,
+        effective: SummaryModel,
+        langDefault: SummaryModel,
+        @ViewBuilder detail: () -> Detail
+    ) -> some View {
+        Button {
+            appState.setSummaryModelOverride(model == langDefault ? nil : model, for: documentID)
+        } label: {
+            HStack {
+                if model == effective {
+                    Image(systemName: "checkmark")
+                }
+                Text(appState.displayName(for: model))
+                detail()
+            }
+        }
     }
 
     /// Per-summary opt-in for the glossary appendix. Hidden when no glossary
@@ -738,11 +760,16 @@ struct TranscriptDetailView: View {
             if isSummarizingThis {
                 liveStreamingBlock()
                     .transition(summaryCardTransition)
-            } else if doc.summary?.isEmpty == false {
-                savedSummaryBlock(for: doc)
-            } else if let msg = summaryErrorMessage {
-                summaryErrorBlock(msg)
-                    .transition(summaryCardTransition)
+            } else {
+                // A failed Regenerate keeps the previous summary, so show the
+                // error above it rather than hiding it.
+                if let msg = summaryErrorMessage {
+                    summaryErrorBlock(msg)
+                        .transition(summaryCardTransition)
+                }
+                if doc.summary?.isEmpty == false {
+                    savedSummaryBlock(for: doc)
+                }
             }
         }
         .animation(entranceAnimation, value: isSummarizingThis)
@@ -858,7 +885,16 @@ struct TranscriptDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.space2) {
                     Text("Summarization failed").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
+                Spacer(minLength: 0)
+                Button {
+                    appState.dismissSummarizationError()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.pressable)
+                .help("Dismiss")
             }
         }
     }

@@ -1,7 +1,8 @@
 import Foundation
 
 /// Persists summarization settings (default model per language, editable system
-/// prompts, and which models have been downloaded) via UserDefaults.
+/// prompts, which models have been downloaded, and the registered Azure
+/// deployments) via UserDefaults.
 ///
 /// Cache inspection is a pragmatic heuristic — we record the "downloaded"
 /// flag when `SummarizationEngine.prefetch` finishes successfully, and the
@@ -14,6 +15,7 @@ enum SummaryStore {
     private static let systemPromptPrefix    = "Summary.SystemPrompt."     // + language raw value
     private static let downloadedIDsKey      = "Summary.DownloadedModelIDs"
     private static let userDisplayNameKey    = "Summary.UserDisplayName"
+    private static let azureDeploymentsKey   = "Summary.AzureDeployments"
 
     // MARK: - Defaults
 
@@ -34,13 +36,27 @@ enum SummaryStore {
 
     // MARK: - Load
 
-    static func loadDefaultModel(for language: TranscriptionLanguage) -> LanguageModel {
+    /// The saved default, or the built-in local one when nothing is saved or
+    /// the saved Azure deployment no longer exists.
+    static func loadDefaultModel(for language: TranscriptionLanguage) -> SummaryModel {
         let key = defaultModelPrefix + language.rawValue
         if let raw = UserDefaults.standard.string(forKey: key),
-           let model = LanguageModel(rawValue: raw) {
-            return model
+           let model = SummaryModel(rawValue: raw) {
+            switch model {
+            case .local:
+                return model
+            case .azure(let id) where loadAzureDeployments().contains(where: { $0.id == id }):
+                return model
+            case .azure:
+                break
+            }
         }
-        return defaultModel(for: language)
+        return .local(defaultModel(for: language))
+    }
+
+    static func loadAzureDeployments() -> [AzureDeployment] {
+        guard let data = UserDefaults.standard.data(forKey: azureDeploymentsKey) else { return [] }
+        return (try? JSONDecoder().decode([AzureDeployment].self, from: data)) ?? []
     }
 
     static func loadSystemPrompt(for language: TranscriptionLanguage) -> String {
@@ -58,7 +74,7 @@ enum SummaryStore {
 
     // MARK: - Save
 
-    static func saveDefaultModel(_ model: LanguageModel, for language: TranscriptionLanguage) {
+    static func saveDefaultModel(_ model: SummaryModel, for language: TranscriptionLanguage) {
         UserDefaults.standard.set(model.rawValue, forKey: defaultModelPrefix + language.rawValue)
     }
 
@@ -68,6 +84,11 @@ enum SummaryStore {
 
     static func saveDownloadedIDs(_ ids: Set<String>) {
         UserDefaults.standard.set(Array(ids), forKey: downloadedIDsKey)
+    }
+
+    static func saveAzureDeployments(_ deployments: [AzureDeployment]) {
+        guard let data = try? JSONEncoder().encode(deployments) else { return }
+        UserDefaults.standard.set(data, forKey: azureDeploymentsKey)
     }
 
     static func loadUserDisplayName() -> String {

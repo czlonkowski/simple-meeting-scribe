@@ -23,7 +23,8 @@ licensed; fork it, strip it, reshape it — it's yours.
 - Saves `.md` + `.json` transcripts to `~/Documents/MeetingTranscripts/`.
 - Optional on-device LLM summarization + action items + auto-titles via
   [MLX](https://github.com/ml-explore/mlx-swift-lm) — Bielik for Polish,
-  Qwen3.5 for English.
+  Qwen3.5 for English — or with your own Azure OpenAI deployments
+  (Settings → Summary → Azure OpenAI deployments), pickable per meeting.
 - Drag any `.mp4` / `.m4a` / `.mov` / `.wav` / `.mp3` onto the window to
   transcribe an existing recording.
 

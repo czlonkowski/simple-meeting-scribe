@@ -37,7 +37,9 @@
 		507944D8E868E78874A1D649 /* DictionaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CAE8E9C764D6CDA49107B1 /* DictionaryStore.swift */; };
 		51879EF3FD869D7217785FF5 /* LongRecordingNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B8E4EF5B4DCB90856C1560 /* LongRecordingNotifier.swift */; };
 		51FA4D4E1F464BF12012386B /* TranscriptListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE300DB0019AB62E18682B6 /* TranscriptListRow.swift */; };
+		542A9891CF8C9C4676D3EA5D /* SummaryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E393348DDB824DD57C8DED /* SummaryModel.swift */; };
 		55DB78C459C39C804D6C84A6 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C72F83AAB72FB3D681FAF15 /* SystemAudioCapture.swift */; };
+		572307D9BDF9EAFC77050A95 /* AzureOpenAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76816121BD438F63E611FAEB /* AzureOpenAIClient.swift */; };
 		5B31C1679CF38E2E05D061CB /* SummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796D2B939DC45511BCCF3BAC /* SummaryStore.swift */; };
 		5F46A90CD6DE58749E947F6F /* meeting-patterns.json in Resources */ = {isa = PBXBuildFile; fileRef = 9580D9A82FEF7CAA918C1603 /* meeting-patterns.json */; };
 		5F808BED96B2FF68BB1F8CFD /* SummarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786FFF93E02176FD8FE629D7 /* SummarizationEngine.swift */; };
@@ -51,6 +53,7 @@
 		693688CDE3E25206223914D9 /* ParakeetSegmenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C85BA58CD0622B58C7A7B2 /* ParakeetSegmenterTests.swift */; };
 		7638A4BDEE638058887A3F4A /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64005F4AC02855F2487ED608 /* ScreenRecorder.swift */; };
 		76768FF6CFDBFF736A6DC54A /* MLXHuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 1AD471B4C39D22F7B5C4F309 /* MLXHuggingFace */; };
+		779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC129E33DD25FDF3CA452C9 /* AzureDeploymentEditor.swift */; };
 		7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */; };
 		7C2C912AEFC7627E0D6D3834 /* InputDeviceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34215358EE13E745C5772DB8 /* InputDeviceSelection.swift */; };
 		7E2666768562D174D44038B7 /* TranscriptionPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6602515950B34F876B321764 /* TranscriptionPipeline.swift */; };
@@ -63,6 +66,7 @@
 		9DD2A32232B244F79E690EDE /* ScribeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90E6B95E62A9BE361A80BAC /* ScribeEngine.swift */; };
 		9EBEDAB8745E070C6B1CBF74 /* ParakeetEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07118CE8E743DE6F1110C42E /* ParakeetEngine.swift */; };
 		A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */; };
+		A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */; };
 		A3EEF01BC86F4412AD0CF2F4 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 83824903C28D6B7CD12C27C1 /* MLXLMCommon */; };
 		A4EDB35392CFE4215DF3A890 /* MAITranscribeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7C63070B950873957610F6 /* MAITranscribeEngineTests.swift */; };
 		A5846FBDEF3A1A2D7911C7D6 /* WhisperModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D14FDA8F76E58108013778 /* WhisperModelTests.swift */; };
@@ -76,6 +80,7 @@
 		BE597539792C85FAE74C00E9 /* TranscriptDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50878A9F431694BAFD646321 /* TranscriptDetailView.swift */; };
 		BE8E98EFCFDD5FC6E3A6CA32 /* MAISegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28418CE4CF8D9BE84F010DD7 /* MAISegmenter.swift */; };
 		C03DFCDB27987D06D6E28CB3 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = F9445D33B6D9FF2FF3EE56DC /* MLXVLM */; };
+		C079EDEFCB5C2A53ACDE9838 /* AzureDeployment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2090EEE4DE0CDE241F604ED7 /* AzureDeployment.swift */; };
 		C5986FA66B79453646B53B7D /* DiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8736328A617B6DE411A50A01 /* DiarizationEngine.swift */; };
 		C64833D83A5AF134F82AB534 /* RecordingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159BFB364327253A27D37567 /* RecordingCoordinator.swift */; };
 		C75550865153434635D44405 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5861A952DB8166D0C30E7D34 /* Assets.xcassets */; };
@@ -84,6 +89,7 @@
 		DE7185F5C9D8CC94B956BA12 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C8072DD9DA5CE0CB00722E /* SettingsView.swift */; };
 		F2B91F23BC34499C84F3DB78 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29F0AD58655A7C4E5F3E987 /* AppState.swift */; };
 		F43205C19587B8B3E73A29C0 /* MicHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDCE3FA48709D76E22D398E1 /* MicHealth.swift */; };
+		F4C925651440365E1E570880 /* SummaryPass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D816383958DA1C80FFB3FF1 /* SummaryPass.swift */; };
 		F780EEC8187DDBF76877E5FA /* MCPLocalServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB18A34984713FF19D952CFF /* MCPLocalServer.swift */; };
 		F8FE95679B863CFC10AB44BB /* MeetingDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFFC6E02D883DDE51789ACAE /* MeetingDetectorTests.swift */; };
 		FAD8AF8C0281E200C4D53734 /* TranscriptStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */; };
@@ -109,6 +115,7 @@
 		159BFB364327253A27D37567 /* RecordingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCoordinator.swift; sourceTree = "<group>"; };
 		1C72F83AAB72FB3D681FAF15 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		1EFCAADFF16701FAABD36947 /* TranscriptMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptMergerTests.swift; sourceTree = "<group>"; };
+		2090EEE4DE0CDE241F604ED7 /* AzureDeployment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureDeployment.swift; sourceTree = "<group>"; };
 		22DD73103EF9029FE0045631 /* WhisperEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperEngine.swift; sourceTree = "<group>"; };
 		28418CE4CF8D9BE84F010DD7 /* MAISegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MAISegmenter.swift; sourceTree = "<group>"; };
 		2AD253098B51F28EB52CB220 /* WordReplacementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordReplacementService.swift; sourceTree = "<group>"; };
@@ -118,11 +125,13 @@
 		31F58F4E87E62C950348C035 /* MAISegmenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MAISegmenterTests.swift; sourceTree = "<group>"; };
 		34215358EE13E745C5772DB8 /* InputDeviceSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDeviceSelection.swift; sourceTree = "<group>"; };
 		34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreTests.swift; sourceTree = "<group>"; };
+		37E393348DDB824DD57C8DED /* SummaryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryModel.swift; sourceTree = "<group>"; };
 		398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongRecordingAlertTests.swift; sourceTree = "<group>"; };
 		4246F4B0562F70223BDBE3AF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		48B9C8A0387E7A87C2517C2A /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		4C2C969565FB5B3E017B55F7 /* ParakeetSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetSegmenter.swift; sourceTree = "<group>"; };
 		4C603C6C0CA3E5F2925084A6 /* MediaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImporter.swift; sourceTree = "<group>"; };
+		4D816383958DA1C80FFB3FF1 /* SummaryPass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryPass.swift; sourceTree = "<group>"; };
 		4F7C63070B950873957610F6 /* MAITranscribeEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MAITranscribeEngineTests.swift; sourceTree = "<group>"; };
 		50878A9F431694BAFD646321 /* TranscriptDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDetailView.swift; sourceTree = "<group>"; };
 		5861A952DB8166D0C30E7D34 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -133,6 +142,8 @@
 		68439AE33D5159F8474261AF /* MicHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicHealthTests.swift; sourceTree = "<group>"; };
 		747B97F80070E768617576E9 /* MCPTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTools.swift; sourceTree = "<group>"; };
 		7553778A8A8B77A6E443E32C /* TagStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagStore.swift; sourceTree = "<group>"; };
+		7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureSummarizationTests.swift; sourceTree = "<group>"; };
+		76816121BD438F63E611FAEB /* AzureOpenAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureOpenAIClient.swift; sourceTree = "<group>"; };
 		786FFF93E02176FD8FE629D7 /* SummarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummarizationEngine.swift; sourceTree = "<group>"; };
 		796D2B939DC45511BCCF3BAC /* SummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryStore.swift; sourceTree = "<group>"; };
 		85B1F17182686AEEE558E198 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -157,6 +168,7 @@
 		C8962C7B76F2E96924E243CD /* SystemStemAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStemAnalyzer.swift; sourceTree = "<group>"; };
 		C9D14FDA8F76E58108013778 /* WhisperModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperModelTests.swift; sourceTree = "<group>"; };
 		CB7F2B018F13905073BE6C30 /* MixedAudioExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioExporterTests.swift; sourceTree = "<group>"; };
+		CFC129E33DD25FDF3CA452C9 /* AzureDeploymentEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureDeploymentEditor.swift; sourceTree = "<group>"; };
 		D06AD4E21191BEAF30724A64 /* LanguageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageModel.swift; sourceTree = "<group>"; };
 		D07A7BB979EB354E14F0529E /* TranscriptMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptMerger.swift; sourceTree = "<group>"; };
 		D29F0AD58655A7C4E5F3E987 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -242,8 +254,12 @@
 		9098BE804D6BCD68A0E1E6F2 /* Summarize */ = {
 			isa = PBXGroup;
 			children = (
+				2090EEE4DE0CDE241F604ED7 /* AzureDeployment.swift */,
+				76816121BD438F63E611FAEB /* AzureOpenAIClient.swift */,
 				D06AD4E21191BEAF30724A64 /* LanguageModel.swift */,
 				786FFF93E02176FD8FE629D7 /* SummarizationEngine.swift */,
+				37E393348DDB824DD57C8DED /* SummaryModel.swift */,
+				4D816383958DA1C80FFB3FF1 /* SummaryPass.swift */,
 				BC3853E93A2C23F7C34E06B9 /* SummaryPrompts.swift */,
 			);
 			path = Summarize;
@@ -276,6 +292,7 @@
 			isa = PBXGroup;
 			children = (
 				863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */,
+				7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */,
 				A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */,
 				D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */,
 				398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */,
@@ -329,6 +346,7 @@
 			isa = PBXGroup;
 			children = (
 				B1DBF4A5AA0765B8AC813D0A /* AudioPlayerCard.swift */,
+				CFC129E33DD25FDF3CA452C9 /* AzureDeploymentEditor.swift */,
 				A9DF34BD84516093E582B6AD /* ImportFileSheet.swift */,
 				A695BDA0BDC7F7DA22A91CEB /* MeetingJoinSheet.swift */,
 				D3C08E8F4B6F85AE23697D53 /* RecordView.swift */,
@@ -488,6 +506,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */,
+				A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */,
 				16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */,
 				B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */,
 				A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */,
@@ -514,6 +533,9 @@
 				691C9A5CB146B9B0172127E6 /* AudioMixdown.swift in Sources */,
 				2AD40271BB8DAC23E08BD939 /* AudioPlayerCard.swift in Sources */,
 				6774761336C49091EB654940 /* AudioRecorder.swift in Sources */,
+				C079EDEFCB5C2A53ACDE9838 /* AzureDeployment.swift in Sources */,
+				779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */,
+				572307D9BDF9EAFC77050A95 /* AzureOpenAIClient.swift in Sources */,
 				8CDE1BB3AA1C09720FAF1868 /* BrowserURLQuery.swift in Sources */,
 				C5986FA66B79453646B53B7D /* DiarizationEngine.swift in Sources */,
 				507944D8E868E78874A1D649 /* DictionaryStore.swift in Sources */,
@@ -546,6 +568,8 @@
 				9DD2A32232B244F79E690EDE /* ScribeEngine.swift in Sources */,
 				DE7185F5C9D8CC94B956BA12 /* SettingsView.swift in Sources */,
 				5F808BED96B2FF68BB1F8CFD /* SummarizationEngine.swift in Sources */,
+				542A9891CF8C9C4676D3EA5D /* SummaryModel.swift in Sources */,
+				F4C925651440365E1E570880 /* SummaryPass.swift in Sources */,
 				244B05E7297E189047B9B569 /* SummaryPrompts.swift in Sources */,
 				5B31C1679CF38E2E05D061CB /* SummaryStore.swift in Sources */,
 				55DB78C459C39C804D6C84A6 /* SystemAudioCapture.swift in Sources */,

@@ -446,6 +446,7 @@ private struct SummarySettingsView: View {
     @State private var selectedGlossaryIDs: Set<UUID> = []
     @State private var newGlossaryTerm: String = ""
     @State private var newGlossaryDefinition: String = ""
+    @State private var editingDeployment: AzureDeployment?
 
     var body: some View {
         @Bindable var state = appState
@@ -467,22 +468,8 @@ private struct SummarySettingsView: View {
             }
 
             Section {
-                Picker("English", selection: Binding(
-                    get: { appState.defaultModelEnglish },
-                    set: { appState.setDefaultModel($0, for: .english) }
-                )) {
-                    ForEach(LanguageModel.allCases.filter { $0.supportedLanguages.contains(.english) }) { m in
-                        Text(m.displayName).tag(m)
-                    }
-                }
-                Picker("Polish", selection: Binding(
-                    get: { appState.defaultModelPolish },
-                    set: { appState.setDefaultModel($0, for: .polish) }
-                )) {
-                    ForEach(LanguageModel.allCases.filter { $0.supportedLanguages.contains(.polish) }) { m in
-                        Text(m.displayName).tag(m)
-                    }
-                }
+                defaultModelPicker("English", language: .english)
+                defaultModelPicker("Polish", language: .polish)
             } header: {
                 Text("Default model per language")
                     .font(Theme.sectionTitleFont)
@@ -501,6 +488,27 @@ private struct SummarySettingsView: View {
                     .font(Theme.sectionTitleFont)
             } footer: {
                 Text("Pre-download models so the first summary is instant. Files live under ~/Documents/huggingface/models/.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                ForEach(appState.azureDeployments) { deployment in
+                    AzureDeploymentRow(deployment: deployment) {
+                        editingDeployment = deployment
+                    }
+                }
+                Button {
+                    editingDeployment = AzureDeployment()
+                } label: {
+                    Label("Add Deployment…", systemImage: "plus")
+                }
+                .buttonStyle(.pressable)
+            } header: {
+                Text("Azure OpenAI deployments")
+                    .font(Theme.sectionTitleFont)
+            } footer: {
+                Text("Summarizing with an Azure deployment sends the transcript to that Azure resource. Pick a deployment as a default above or per meeting next to the Summarize button. Keys are stored in the macOS Keychain.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -629,6 +637,28 @@ private struct SummarySettingsView: View {
             englishPromptDraft = appState.systemPromptEnglish
             polishPromptDraft  = appState.systemPromptPolish
         }
+        .sheet(item: $editingDeployment) { deployment in
+            AzureDeploymentEditor(deployment: deployment)
+        }
+    }
+
+    /// Local models that support `language`, then every Azure deployment
+    /// (the cloud models are multilingual).
+    private func defaultModelPicker(_ title: String, language: TranscriptionLanguage) -> some View {
+        Picker(title, selection: Binding(
+            get: { appState.defaultSummaryModel(for: language) },
+            set: { appState.setDefaultModel($0, for: language) }
+        )) {
+            ForEach(LanguageModel.allCases.filter { $0.supportedLanguages.contains(language) }) { m in
+                Text(m.displayName).tag(SummaryModel.local(m))
+            }
+            if !appState.azureDeployments.isEmpty {
+                Divider()
+                ForEach(appState.azureDeployments) { d in
+                    Text(appState.displayName(for: .azure(d.id))).tag(SummaryModel.azure(d.id))
+                }
+            }
+        }
     }
 
     private func addGlossaryEntry() {
@@ -658,6 +688,47 @@ private struct SummarySettingsView: View {
             }
         default: break
         }
+    }
+}
+
+private struct AzureDeploymentRow: View {
+    let deployment: AzureDeployment
+    let edit: () -> Void
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Theme.space6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(deployment.displayName).font(.headline)
+                Text("\(deployment.deployment) · \(URL(string: deployment.endpoint)?.host ?? deployment.endpoint)")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                Text("Reasoning: \(deployment.reasoningEffort.displayName)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            if !appState.hasAzureAPIKey(endpoint: deployment.endpoint) {
+                Label("No key", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+            Button(action: edit) {
+                Image(systemName: "pencil")
+            }
+            .controlSize(.small)
+            .buttonStyle(.pressable)
+            .help("Edit this deployment")
+            Button(role: .destructive) {
+                appState.deleteAzureDeployment(id: deployment.id)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .controlSize(.small)
+            .buttonStyle(.pressable)
+            .help("Remove this deployment")
+        }
+        .padding(.vertical, Theme.space2)
     }
 }
 

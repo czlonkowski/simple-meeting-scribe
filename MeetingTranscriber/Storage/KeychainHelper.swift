@@ -101,3 +101,17 @@ enum AzureSpeechStore {
                                   forKey: endpointDefaultsKey)
     }
 }
+
+/// Azure OpenAI API keys, one per resource (`AzureDeployment.resourceKey`),
+/// so every deployment on a resource shares its key.
+enum AzureOpenAIKeyStore {
+    private static func key(for resource: String) -> StoredAPIKey {
+        StoredAPIKey(account: "azure-openai-key:" + resource)
+    }
+
+    /// Returns nil when no key is configured.
+    static func loadAPIKey(resource: String) -> String? { key(for: resource).load() }
+
+    /// Empty (after trimming) removes the stored key.
+    static func saveAPIKey(_ value: String, resource: String) { key(for: resource).save(value) }
+}

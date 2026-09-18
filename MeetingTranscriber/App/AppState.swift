@@ -138,8 +138,9 @@ final class AppState {
     }
 
     // MARK: – Summarization settings (persisted via SummaryStore)
-    var defaultModelEnglish: LanguageModel = SummaryStore.loadDefaultModel(for: .english)
-    var defaultModelPolish:  LanguageModel = SummaryStore.loadDefaultModel(for: .polish)
+    var defaultModelEnglish: SummaryModel  = SummaryStore.loadDefaultModel(for: .english)
+    var defaultModelPolish:  SummaryModel  = SummaryStore.loadDefaultModel(for: .polish)
+    var azureDeployments: [AzureDeployment] = SummaryStore.loadAzureDeployments()
     var systemPromptEnglish: String        = SummaryStore.loadSystemPrompt(for: .english)
     var systemPromptPolish:  String        = SummaryStore.loadSystemPrompt(for: .polish)
     var downloadedModelIDs:  Set<String>   = SummaryStore.loadDownloadedIDs()
@@ -154,7 +155,7 @@ final class AppState {
         SummaryStore.saveUserDisplayName(userDisplayName)
     }
 
-    func setDefaultModel(_ model: LanguageModel, for language: TranscriptionLanguage) {
+    func setDefaultModel(_ model: SummaryModel, for language: TranscriptionLanguage) {
         switch language {
         case .english: defaultModelEnglish = model
         case .polish:  defaultModelPolish = model
@@ -162,9 +163,29 @@ final class AppState {
         SummaryStore.saveDefaultModel(model, for: language)
     }
 
+    func defaultSummaryModel(for language: TranscriptionLanguage) -> SummaryModel {
+        language == .polish ? defaultModelPolish : defaultModelEnglish
+    }
+
+    /// Menu and picker label of a summary model.
+    func displayName(for model: SummaryModel) -> String {
+        switch model {
+        case .local(let local): local.displayName
+        case .azure(let id):    azureDeployment(id: id).map { "\($0.displayName) (Azure)" } ?? "Removed Azure deployment"
+        }
+    }
+
+    /// Compact label for the per-meeting model chip.
+    func shortName(for model: SummaryModel) -> String {
+        switch model {
+        case .local(let local): local.shortName
+        case .azure(let id):    azureDeployment(id: id)?.displayName ?? "Removed Azure deployment"
+        }
+    }
+
     /// Per-meeting summary model override. Pass `nil` to clear and fall back to
     /// the language default from Settings.
-    func setSummaryModelOverride(_ model: LanguageModel?, for transcriptID: String) {
+    func setSummaryModelOverride(_ model: SummaryModel?, for transcriptID: String) {
         guard let idx = transcripts.firstIndex(where: { $0.id == transcriptID }) else { return }
         var updated = transcripts[idx]
         updated.summaryModelOverride = model
@@ -180,6 +201,81 @@ final class AppState {
         SummaryStore.saveSystemPrompt(text, for: language)
     }
 
+    // MARK: – Azure deployments (persisted via SummaryStore + Keychain)
+
+    func azureDeployment(id: UUID) -> AzureDeployment? {
+        azureDeployments.first { $0.id == id }
+    }
+
+    /// Whether a key is stored for the Azure resource `endpoint` points at.
+    func hasAzureAPIKey(endpoint: String) -> Bool {
+        guard let resource = AzureDeployment.resourceKey(endpoint: endpoint) else { return false }
+        return AzureOpenAIKeyStore.loadAPIKey(resource: resource) != nil
+    }
+
+    /// Add or update a deployment. A non-empty `apiKey` becomes the key of the
+    /// deployment's resource; an empty one keeps the stored key.
+    func saveAzureDeployment(_ deployment: AzureDeployment, apiKey: String) {
+        var cleaned = deployment
+        cleaned.name = deployment.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        cleaned.endpoint = deployment.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        cleaned.deployment = deployment.deployment.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let previousResource = azureDeployment(id: cleaned.id)?.resourceKey
+        if let idx = azureDeployments.firstIndex(where: { $0.id == cleaned.id }) {
+            azureDeployments[idx] = cleaned
+        } else {
+            azureDeployments.append(cleaned)
+        }
+        SummaryStore.saveAzureDeployments(azureDeployments)
+
+        let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !key.isEmpty, let resource = cleaned.resourceKey {
+            AzureOpenAIKeyStore.saveAPIKey(key, resource: resource)
+        }
+        if let previousResource { deleteAzureKeyIfUnused(previousResource) }
+    }
+
+    /// Remove a deployment. Settings defaults that used it fall back to the
+    /// built-in local model; meetings that picked it ask for another model
+    /// when summarized, so their transcript never goes to a resource the user
+    /// didn't choose. The resource key is deleted once no deployment uses it.
+    func deleteAzureDeployment(id: UUID) {
+        guard let idx = azureDeployments.firstIndex(where: { $0.id == id }) else { return }
+        let removed = azureDeployments.remove(at: idx)
+        SummaryStore.saveAzureDeployments(azureDeployments)
+        for language in TranscriptionLanguage.allCases
+        where defaultSummaryModel(for: language) == .azure(id) {
+            setDefaultModel(.local(SummaryStore.defaultModel(for: language)), for: language)
+        }
+        if let resource = removed.resourceKey { deleteAzureKeyIfUnused(resource) }
+    }
+
+    private func deleteAzureKeyIfUnused(_ resource: String) {
+        guard !azureDeployments.contains(where: { $0.resourceKey == resource }) else { return }
+        AzureOpenAIKeyStore.saveAPIKey("", resource: resource)
+    }
+
+    /// Send a tiny request with the editor's current values. An empty
+    /// `apiKey` uses the key stored for the endpoint's resource.
+    func testAzureDeployment(_ deployment: AzureDeployment, apiKey: String) async throws -> String {
+        let typed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = typed.isEmpty
+            ? deployment.resourceKey.flatMap { AzureOpenAIKeyStore.loadAPIKey(resource: $0) } ?? ""
+            : typed
+        return try await AzureOpenAIClient(deployment: deployment, apiKey: key).test()
+    }
+
+    /// The Azure client for a deployment, or the error explaining why it
+    /// can't be used.
+    private func azureClient(for id: UUID) throws -> AzureOpenAIClient {
+        guard let deployment = azureDeployment(id: id) else {
+            throw AzureOpenAIClient.AzureOpenAIError.deploymentRemoved
+        }
+        let key = deployment.resourceKey.flatMap { AzureOpenAIKeyStore.loadAPIKey(resource: $0) } ?? ""
+        return try AzureOpenAIClient(deployment: deployment, apiKey: key)
+    }
+
     // MARK: – Summarization runtime state
     enum ModelDownloadState: Equatable {
         case notDownloaded
@@ -188,6 +284,20 @@ final class AppState {
     }
     var modelDownloadStates: [LanguageModel: ModelDownloadState] = [:]
     private var downloadTasks: [LanguageModel: Task<Void, Error>] = [:]
+
+    /// Where one summary run's passes go, resolved before the run starts.
+    private enum SummaryBackend: Sendable {
+        case local(LanguageModel)
+        case azure(AzureOpenAIClient)
+
+        /// Recorded as the summary's model on the transcript.
+        var shortName: String {
+            switch self {
+            case .local(let model):  model.shortName
+            case .azure(let client): client.deployment.shortName
+            }
+        }
+    }
 
     enum SummarizationStage: Equatable {
         case idle
@@ -308,25 +418,37 @@ final class AppState {
     func summarize(
         transcriptID: String,
         customSummaryInstruction: String? = nil,
-        model: LanguageModel? = nil,
+        model: SummaryModel? = nil,
         useGlossary: Bool = true,
         inferSpeakerNames: Bool = true
     ) {
         guard let doc = transcripts.first(where: { $0.id == transcriptID }) else { return }
         guard summarizeTask == nil else { return }
-        cancelIdleUnload()
 
         let language = doc.language
-        let resolvedModel: LanguageModel = model
+        let resolvedModel: SummaryModel = model
             ?? doc.summaryModelOverride
-            ?? (language == .polish ? defaultModelPolish : defaultModelEnglish)
+            ?? defaultSummaryModel(for: language)
+        let backend: SummaryBackend
+        switch resolvedModel {
+        case .local(let local):
+            backend = .local(local)
+        case .azure(let id):
+            do {
+                backend = .azure(try azureClient(for: id))
+            } catch {
+                // Surface in the summary card; the existing summary stays.
+                summarizingTranscriptID = transcriptID
+                summarizationStage = .error(error.localizedDescription)
+                return
+            }
+        }
         let basePrompt = language == .polish ? systemPromptPolish : systemPromptEnglish
         let glossaryAppendix: String? = useGlossary
             ? SummaryPrompts.glossaryBlock(for: language, terms: glossaryTerms)
             : nil
         let systemPrompt: String = glossaryAppendix.map { basePrompt + "\n\n" + $0 } ?? basePrompt
         let initialFeed = TranscriptFormatter.renderPlainForLLM(doc)
-        let disableThinking = resolvedModel.usesThinkingMode
         let configuredUserName = userDisplayName
         let currentTitle = doc.title
         // For imported files, sourceURL holds the original filename (see
@@ -335,19 +457,47 @@ final class AppState {
         let sourceFilename = (doc.sourceKind == .imported) ? doc.sourceURL : nil
 
         summarizingTranscriptID = transcriptID
-        summarizationStage = .loadingModel(fraction: 0)
+        switch backend {
+        case .local:
+            // Keep the resident model for this run; re-armed when it ends.
+            cancelIdleUnload()
+            summarizationStage = .loadingModel(fraction: 0)
+        case .azure:
+            summarizationStage = .identifyingSpeakers
+        }
 
         summarizeTask = Task { [weak self, summaryEngine] in
             defer {
                 Task { @MainActor in self?.summarizeTask = nil }
             }
-            do {
-                try await summaryEngine.ensureLoaded(resolvedModel) { fraction in
-                    Task { @MainActor in
-                        self?.summarizationStage = .loadingModel(fraction: fraction)
-                    }
+            /// One streamed LLM pass on the run's backend.
+            func streamPass(_ pass: SummaryPass, prompt: String) async throws -> AsyncThrowingStream<String, Error> {
+                switch backend {
+                case .local(let local):
+                    try await summaryEngine.stream(
+                        prompt: prompt,
+                        instructions: systemPrompt,
+                        maxTokens: pass.localMaxTokens,
+                        temperature: pass.localTemperature,
+                        disableThinking: local.usesThinkingMode
+                    )
+                case .azure(let client):
+                    client.stream(
+                        prompt: prompt,
+                        instructions: systemPrompt,
+                        maxCompletionTokens: pass.cloudMaxCompletionTokens
+                    )
                 }
-                await MainActor.run { self?.markDownloaded(resolvedModel) }
+            }
+            do {
+                if case .local(let local) = backend {
+                    try await summaryEngine.ensureLoaded(local) { fraction in
+                        Task { @MainActor in
+                            self?.summarizationStage = .loadingModel(fraction: fraction)
+                        }
+                    }
+                    await MainActor.run { self?.markDownloaded(local) }
+                }
 
                 // --- Identification phase (runs before the summary pass so
                 //     downstream prompts see real names instead of "Remote N") ---
@@ -376,18 +526,14 @@ final class AppState {
                         for: language,
                         labels: remoteToInfer.map(\.name)
                     ) + "\n\nTranscript:\n" + initialFeed
-                    let identifyStream = try await summaryEngine.stream(
-                        prompt: identifyPrompt,
-                        instructions: systemPrompt,
-                        maxTokens: 200,
-                        temperature: 0.1,
-                        disableThinking: disableThinking
-                    )
+                    let identifyStream = try await streamPass(.identifySpeakers, prompt: identifyPrompt)
                     var identifyRaw = ""
                     for try await chunk in identifyStream {
                         if Task.isCancelled { throw SummarizationError.cancelled }
                         identifyRaw += chunk
                     }
+                    // A cancelled consumer ends the stream without an error.
+                    try Task.checkCancellation()
                     let cleaned = SummaryPrompts.stripThinking(identifyRaw)
                     let inferred = SummaryPrompts.parseInferredNames(cleaned)
                     for i in workingSpeakers.indices {
@@ -430,13 +576,7 @@ final class AppState {
                 let summaryPrompt =
                     effectiveSummaryInstruction
                     + "\n\nTranscript:\n" + feed
-                let summaryStream = try await summaryEngine.stream(
-                    prompt: summaryPrompt,
-                    instructions: systemPrompt,
-                    maxTokens: 600,
-                    temperature: 0.3,
-                    disableThinking: disableThinking
-                )
+                let summaryStream = try await streamPass(.summary, prompt: summaryPrompt)
                 for try await chunk in summaryStream {
                     if Task.isCancelled { throw SummarizationError.cancelled }
                     summaryText += chunk
@@ -445,6 +585,7 @@ final class AppState {
                         self?.summarizationStage = .generatingSummary(text: visible)
                     }
                 }
+                try Task.checkCancellation()
 
                 // Freeze the finalized summary so the UI keeps it visible
                 // during the next streaming passes.
@@ -466,20 +607,15 @@ final class AppState {
                     SummaryPrompts.titleInstruction(for: language)
                     + "\n\nSummary:\n"
                     + (finalizedSummary.isEmpty ? feed : finalizedSummary)
-                let titleStream = try await summaryEngine.stream(
-                    prompt: titlePrompt,
-                    instructions: systemPrompt,
-                    maxTokens: 40,
-                    temperature: 0.2,
-                    disableThinking: disableThinking
-                )
+                let titleStream = try await streamPass(.title, prompt: titlePrompt)
                 for try await chunk in titleStream {
                     if Task.isCancelled { throw SummarizationError.cancelled }
                     titleText += chunk
                 }
+                try Task.checkCancellation()
 
                 let finalTitle = SummaryPrompts.sanitizeTitle(titleText)
-                let modelShort = resolvedModel.shortName
+                let modelShort = backend.shortName
 
                 await MainActor.run {
                     guard let self else { return }
@@ -499,7 +635,7 @@ final class AppState {
                     try? TranscriptStore.shared.save(updated, audioSource: nil)
                     self.summarizationStage = .done
                     self.summarizingTranscriptID = nil
-                    self.scheduleIdleUnload()
+                    if case .local = backend { self.scheduleIdleUnload() }
                 }
             } catch is CancellationError {
                 await MainActor.run {
@@ -508,9 +644,11 @@ final class AppState {
                 }
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                Log.summary.error("summarize failed: \(msg, privacy: .public)")
+                // Keep the transcript ID: the detail view shows the error only
+                // on the meeting it belongs to.
                 await MainActor.run {
                     self?.summarizationStage = .error(msg)
-                    self?.summarizingTranscriptID = nil
                 }
             }
         }
@@ -518,6 +656,12 @@ final class AppState {
 
     func cancelSummarization() {
         summarizeTask?.cancel()
+    }
+
+    func dismissSummarizationError() {
+        guard case .error = summarizationStage else { return }
+        summarizationStage = .idle
+        summarizingTranscriptID = nil
     }
 
     /// Arm a one-shot timer that drops the resident model if the user doesn't
