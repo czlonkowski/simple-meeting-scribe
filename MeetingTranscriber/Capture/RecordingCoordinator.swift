@@ -32,7 +32,8 @@ final class RecordingCoordinator {
                onSystemLevel: @escaping (Float) -> Void,
                onInputDeviceChange: (() -> Void)? = nil,
                onVideoStatus: ((VideoCaptureStatus) -> Void)? = nil,
-               onSystemAudioStatus: ((SystemAudioStatus) -> Void)? = nil) async throws {
+               onSystemAudioStatus: ((SystemAudioStatus) -> Void)? = nil,
+               onMicStatus: ((MicStatus) -> Void)? = nil) async throws {
         let baseURL = Self.makeBaseURL()
         let writer = try StemWriter(baseURL: baseURL)
         self.writer = writer
@@ -46,6 +47,7 @@ final class RecordingCoordinator {
         }
         mic.onLevel = onMicLevel
         mic.onInputDeviceChange = onInputDeviceChange
+        mic.onStatus = onMicStatus
         mic.preferredDeviceUID = inputDeviceUID
         try mic.start()
         micStartDate = Date()

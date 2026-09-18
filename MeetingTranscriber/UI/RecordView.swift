@@ -146,6 +146,13 @@ struct RecordView: View {
                 case .off:
                     EmptyView()
                 }
+                if case .recovering(let silentSeconds) = appState.micStatus {
+                    Text("·").foregroundStyle(.tertiary)
+                    Label(silentSeconds > 0 ? "Restoring microphone (\(silentSeconds)s without audio)"
+                                            : "Restoring microphone",
+                          systemImage: "mic.badge.xmark")
+                        .foregroundStyle(.orange)
+                }
                 if appState.captureSystemAudio {
                     switch appState.systemAudioStatus {
                     case .silent(let seconds):

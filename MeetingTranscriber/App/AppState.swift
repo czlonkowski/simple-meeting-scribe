@@ -602,6 +602,9 @@ final class AppState {
     /// deaf SCStream is otherwise invisible — it keeps delivering silence at
     /// full rate and reports no error.
     var systemAudioStatus: SystemAudioStatus = .ok
+    /// Live health of mic capture: a mic that stops delivering (e.g. AirPods
+    /// reconfiguring system audio) is otherwise silent until the transcript.
+    var micStatus: MicStatus = .ok
 
     // MARK: – Background processing queue
     /// One transcription job — either a freshly captured recording or an
@@ -740,6 +743,7 @@ final class AppState {
         self.recorder = coord
         videoCaptureStatus = .off
         systemAudioStatus = .ok
+        micStatus = .ok
         do {
             try await coord.start(
                 captureSystemAudio: captureSystemAudio,
@@ -762,6 +766,9 @@ final class AppState {
                 },
                 onSystemAudioStatus: { [weak self] status in
                     Task { @MainActor in self?.systemAudioStatus = status }
+                },
+                onMicStatus: { [weak self] status in
+                    Task { @MainActor in self?.micStatus = status }
                 }
             )
             currentInputDeviceName = coord.activeInputDeviceName()
@@ -805,6 +812,7 @@ final class AppState {
             let stems = try await recorder.stop()
             videoCaptureStatus = .off
             systemAudioStatus = .ok
+            micStatus = .ok
             let duration = Date().timeIntervalSince(startedAt)
             let job = ProcessingJob(
                 id: UUID(),
