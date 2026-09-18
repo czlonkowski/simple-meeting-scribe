@@ -22,12 +22,32 @@ creates a **draft** release; publication is a separate action in GitHub.
    ```
 
    These are **maintainer tools**. End users need none of them.
-3. Create a notarytool keychain profile interactively. Supply the Apple ID, team
-   ID, and an app-specific password when prompted; do not put secrets in the repo:
+3. Save notarization credentials in a local keychain profile using either method
+   below. Do not put passwords or private keys in the repository.
+
+   **App-specific password:** generate one at **account.apple.com → Sign-In and
+   Security → App-Specific Passwords**, then supply it, the Apple ID, and team ID
+   when prompted:
 
    ```sh
    xcrun notarytool store-credentials meeting-transcriber-notary
    ```
+
+   **App Store Connect API key:** in **Users and Access → Integrations → App Store
+   Connect API → Team Keys**, create a dedicated key with the **Developer** role.
+   Download its `.p8` file to a private location outside the repository. Copy the
+   Key ID and Issuer ID from that page, then run:
+
+   ```sh
+   xcrun notarytool store-credentials meeting-transcriber-notary \
+     --key /private/path/AuthKey_KEY_ID.p8 \
+     --key-id KEY_ID \
+     --issuer ISSUER_ID
+   ```
+
+   This method does not require an app-specific password. `notarytool` validates
+   the credentials before storing them. Both methods use the same `NOTARY_PROFILE`
+   setting below; the release scripts do not need the password or key file path.
 
 4. Find the exact signing identity and authenticate GitHub CLI:
 

@@ -29,3 +29,7 @@ dist/
 
 # Local Python verification caches
 __pycache__/
+
+# Private Apple signing/notarization credentials
+*.p8
+*.p12
