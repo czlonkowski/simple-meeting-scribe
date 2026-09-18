@@ -45,25 +45,59 @@ enum KeychainHelper {
     }
 }
 
-/// ElevenLabs Scribe credentials.
-enum ScribeStore {
+/// One API key kept as a generic password under the app's Keychain service.
+private struct StoredAPIKey {
     private static let service = "com.czlonkowski.MeetingTranscriber"
-    private static let account = "elevenlabs-api-key"
+    let account: String
 
     /// Returns nil when no key is configured.
-    static func loadAPIKey() -> String? {
-        guard let key = KeychainHelper.read(service: service, account: account),
+    func load() -> String? {
+        guard let key = KeychainHelper.read(service: Self.service, account: account),
               !key.isEmpty else { return nil }
         return key
     }
 
     /// Empty (after trimming) removes the stored key.
-    static func saveAPIKey(_ key: String) {
+    func save(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            KeychainHelper.delete(service: service, account: account)
+            KeychainHelper.delete(service: Self.service, account: account)
         } else {
-            KeychainHelper.save(trimmed, service: service, account: account)
+            KeychainHelper.save(trimmed, service: Self.service, account: account)
         }
+    }
+}
+
+/// ElevenLabs Scribe credentials.
+enum ScribeStore {
+    private static let key = StoredAPIKey(account: "elevenlabs-api-key")
+
+    /// Returns nil when no key is configured.
+    static func loadAPIKey() -> String? { key.load() }
+
+    /// Empty (after trimming) removes the stored key.
+    static func saveAPIKey(_ value: String) { key.save(value) }
+}
+
+/// Azure Speech resource for MAI-Transcribe: the key in the Keychain, the
+/// (non-secret) endpoint in UserDefaults.
+enum AzureSpeechStore {
+    private static let key = StoredAPIKey(account: "azure-speech-key")
+    private static let endpointDefaultsKey = "Transcription.AzureSpeechEndpoint"
+
+    /// Returns nil when no key is configured.
+    static func loadAPIKey() -> String? { key.load() }
+
+    /// Empty (after trimming) removes the stored key.
+    static func saveAPIKey(_ value: String) { key.save(value) }
+
+    /// Resource endpoint, e.g. `https://<resource>.cognitiveservices.azure.com/`.
+    static func loadEndpoint() -> String {
+        UserDefaults.standard.string(forKey: endpointDefaultsKey) ?? ""
+    }
+
+    static func saveEndpoint(_ value: String) {
+        UserDefaults.standard.set(value.trimmingCharacters(in: .whitespacesAndNewlines),
+                                  forKey: endpointDefaultsKey)
     }
 }

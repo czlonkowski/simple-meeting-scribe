@@ -22,7 +22,8 @@ final class AppState {
     private var deviceListObserver: AnyObject?
 
     // MARK: – Settings
-    var selectedModel: WhisperModel = .largeV3Turbo
+    /// Not persisted: every launch starts on `WhisperModel.defaultModel`.
+    var selectedModel: WhisperModel = .defaultModel
     var defaultLanguage: TranscriptionLanguage = .english
     var captureSystemAudio: Bool = true
 
@@ -74,6 +75,22 @@ final class AppState {
     func setElevenLabsAPIKey(_ value: String) {
         elevenLabsAPIKey = value.trimmingCharacters(in: .whitespacesAndNewlines)
         ScribeStore.saveAPIKey(elevenLabsAPIKey)
+    }
+
+    /// Azure Speech key for MAI-Transcribe-2 (persisted in the macOS Keychain).
+    var azureSpeechKey: String = AzureSpeechStore.loadAPIKey() ?? ""
+
+    func setAzureSpeechKey(_ value: String) {
+        azureSpeechKey = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        AzureSpeechStore.saveAPIKey(azureSpeechKey)
+    }
+
+    /// Azure Speech resource endpoint for MAI-Transcribe-2 (UserDefaults).
+    var azureSpeechEndpoint: String = AzureSpeechStore.loadEndpoint()
+
+    func setAzureSpeechEndpoint(_ value: String) {
+        azureSpeechEndpoint = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        AzureSpeechStore.saveEndpoint(azureSpeechEndpoint)
     }
 
     // MARK: – Dictionary (persisted via DictionaryStore)
@@ -618,8 +635,8 @@ final class AppState {
         /// overwrites that document in place (preserving the id + title,
         /// clearing any now-stale summary).
         let replacingDocumentID: String?
-        /// Forces a specific transcription model (local Whisper or cloud
-        /// Scribe) for this job regardless of the user's global
+        /// Forces a specific transcription model (local or cloud) for this
+        /// job regardless of the user's global
         /// `selectedModel`. Used by Re-transcribe.
         let modelOverride: WhisperModel?
         var stage: Stage
@@ -990,6 +1007,8 @@ final class AppState {
                                                   importedFileName: importedName,
                                                   initialPrompt: prime.isEmpty ? nil : prime,
                                                   wordReplacements: wordReplacements,
+                                                  phraseHints: MAISegmenter.phraseHints(glossary: glossaryTerms,
+                                                                                        replacements: wordReplacements),
                                                   progress: progress)
 
             // For re-transcription, preserve the existing document's identity
@@ -1023,9 +1042,9 @@ final class AppState {
             selectedTranscriptID = docToSave.id
             processingJobs.removeAll { $0.id == jobID }
         } catch {
-            // Scribe errors already carry actionable, self-contained messages;
-            // prefixing them with "Transcription failed:" reads doubly framed.
-            if error is ScribeEngine.ScribeError {
+            // Cloud-engine errors already carry actionable, self-contained
+            // messages; prefixing them with "Transcription failed:" reads doubly framed.
+            if error is ScribeEngine.ScribeError || error is MAITranscribeEngine.MAIError {
                 lastError = error.localizedDescription
             } else {
                 lastError = "Transcription failed: \(error.localizedDescription)"

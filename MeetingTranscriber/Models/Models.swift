@@ -29,8 +29,14 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
     // Local, but not WhisperKit: NVIDIA Parakeet TDT 0.6B v3 via FluidAudio
     // (Core ML, Apple Neural Engine). Routed to `ParakeetEngine`.
     case parakeetV3   = "parakeet-tdt-0.6b-v3"
-    // Cloud engine — not a WhisperKit folder; must never reach WhisperEngine.
+    // Cloud engines — not WhisperKit folders; must never reach WhisperEngine.
     case scribeV2     = "elevenlabs-scribe-v2"
+    case maiTranscribe2 = "azure-mai-transcribe-2"
+
+    /// Engine the app starts with. Best Polish accuracy in a 2026-09 comparison
+    /// on real meetings (ahead of Scribe v2 and Whisper large-v3), on par with
+    /// Scribe for English.
+    static let defaultModel: WhisperModel = .maiTranscribe2
 
     var id: String { rawValue }
     var displayName: String {
@@ -39,6 +45,7 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         case .largeV3:      return "Whisper Large v3 (best quality, ~626 MB)"
         case .parakeetV3:   return "Parakeet v3 (fastest, Neural Engine, ~600 MB)"
         case .scribeV2:     return "ElevenLabs Scribe v2 (cloud)"
+        case .maiTranscribe2: return "Microsoft MAI-Transcribe-2 (cloud)"
         }
     }
     var shortName: String {
@@ -47,6 +54,7 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         case .largeV3:      return "large-v3"
         case .parakeetV3:   return "parakeet-v3"
         case .scribeV2:     return "scribe-v2"
+        case .maiTranscribe2: return "mai-transcribe-2"
         }
     }
     /// One-word label for segmented pickers.
@@ -56,10 +64,12 @@ enum WhisperModel: String, CaseIterable, Codable, Identifiable, Hashable {
         case .largeV3:      return "Large"
         case .parakeetV3:   return "Parakeet"
         case .scribeV2:     return "Scribe"
+        case .maiTranscribe2: return "MAI"
         }
     }
-    /// Cloud models are routed to `ScribeEngine`; local ones to `WhisperEngine`.
-    var isCloud: Bool { self == .scribeV2 }
+    /// Cloud models upload one stem mix (`ScribeEngine` / `MAITranscribeEngine`);
+    /// local ones go to `WhisperEngine`.
+    var isCloud: Bool { self == .scribeV2 || self == .maiTranscribe2 }
     /// Local non-Whisper model handled by `ParakeetEngine`.
     var isParakeet: Bool { self == .parakeetV3 }
 }
@@ -105,7 +115,7 @@ struct WordReplacement: Codable, Identifiable, Hashable {
 /// Independent of `WordReplacement` (which rewrites Whisper output post-decoding).
 struct GlossaryTerm: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
-    var term: String              // e.g. "Estyl", "n8n"
+    var term: String              // e.g. "Contoso", "n8n"
     var definition: String        // short explanation, one line preferred
     var isEnabled: Bool = true
 }

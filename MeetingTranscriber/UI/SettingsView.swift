@@ -26,6 +26,20 @@ struct SettingsView: View {
 private struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
 
+    /// Shown when the selected cloud model has no key configured.
+    private var missingKeyWarning: String? {
+        switch appState.selectedModel {
+        case .maiTranscribe2 where MAITranscribeEngine.transcribeURL(endpoint: appState.azureSpeechEndpoint) == nil:
+            return "MAI-Transcribe-2 needs an Azure Speech endpoint (https://…)"
+        case .maiTranscribe2 where appState.azureSpeechKey.isEmpty:
+            return "MAI-Transcribe-2 needs an Azure Speech key"
+        case .scribeV2 where appState.elevenLabsAPIKey.isEmpty:
+            return "Scribe v2 needs an ElevenLabs API key"
+        default:
+            return nil
+        }
+    }
+
     var body: some View {
         @Bindable var state = appState
 
@@ -41,12 +55,20 @@ private struct GeneralSettingsView: View {
                         Text("\(l.flag) \(l.displayName)").tag(l)
                     }
                 }
+                TextField("Azure Speech endpoint", text: Binding(
+                    get: { appState.azureSpeechEndpoint },
+                    set: { appState.setAzureSpeechEndpoint($0) }
+                ), prompt: Text(verbatim: "https://<resource>.cognitiveservices.azure.com/"))
+                SecureField("Azure Speech key", text: Binding(
+                    get: { appState.azureSpeechKey },
+                    set: { appState.setAzureSpeechKey($0) }
+                ))
                 SecureField("ElevenLabs API key", text: Binding(
                     get: { appState.elevenLabsAPIKey },
                     set: { appState.setElevenLabsAPIKey($0) }
                 ))
-                if state.selectedModel.isCloud && state.elevenLabsAPIKey.isEmpty {
-                    Label("Scribe v2 needs an API key", systemImage: "exclamationmark.triangle")
+                if let warning = missingKeyWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                         .font(.caption)
                 }
@@ -54,7 +76,7 @@ private struct GeneralSettingsView: View {
                 Text("Transcription")
                     .font(Theme.sectionTitleFont)
             } footer: {
-                Text("The API key is stored in the macOS Keychain. Required for ElevenLabs Scribe v2 (audio is sent to ElevenLabs for transcription).")
+                Text("API keys are stored in the macOS Keychain. Cloud models upload the meeting audio: MAI-Transcribe-2 to your Azure Speech resource (in the EU, MAI-Transcribe is served from North Europe), Scribe v2 to ElevenLabs.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

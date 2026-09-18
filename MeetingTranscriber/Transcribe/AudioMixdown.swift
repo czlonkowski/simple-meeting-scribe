@@ -21,8 +21,14 @@ enum AudioMixdown {
         // transcription is insensitive to mild clipping.
         for i in 0..<mixed.count { mixed[i] = min(1.0, max(-1.0, mixed[i])) }
 
+        return try writeTempWav(mixed[...], prefix: "cloud_mix")
+    }
+
+    /// Writes samples to a temporary 16 kHz mono 16-bit WAV named
+    /// `<prefix>_<uuid>.wav`. Caller removes the file when done.
+    static func writeTempWav(_ samples: ArraySlice<Float>, prefix: String) throws -> URL {
         let outURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("scribe_mix_\(UUID().uuidString).wav")
+            .appendingPathComponent("\(prefix)_\(UUID().uuidString).wav")
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: 16_000,
@@ -37,14 +43,14 @@ enum AudioMixdown {
                                    commonFormat: .pcmFormatFloat32,
                                    interleaved: false)
         guard let buf = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                         frameCapacity: AVAudioFrameCount(mixed.count)) else {
+                                         frameCapacity: AVAudioFrameCount(samples.count)) else {
             throw NSError(domain: "AudioMixdown", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "buffer alloc failed"])
         }
-        buf.frameLength = AVAudioFrameCount(mixed.count)
-        if let ch = buf.floatChannelData?[0] {
-            mixed.withUnsafeBufferPointer { src in
-                ch.update(from: src.baseAddress!, count: mixed.count)
+        buf.frameLength = AVAudioFrameCount(samples.count)
+        if let ch = buf.floatChannelData?[0], !samples.isEmpty {
+            samples.withUnsafeBufferPointer { src in
+                ch.update(from: src.baseAddress!, count: samples.count)
             }
         }
         try file.write(from: buf)
@@ -105,3 +111,4 @@ enum AudioMixdown {
         return Array(UnsafeBufferPointer(start: channels[0], count: frames))
     }
 }
+

@@ -663,8 +663,7 @@ struct TranscriptDetailView: View {
         } else if TranscriptStore.shared.audioURL(for: doc) != nil {
             Menu {
                 ForEach(retranscribeTargets(for: doc)) { target in
-                    Button(target.isCloud ? "with ElevenLabs Scribe v2 (cloud)"
-                                          : "with Whisper \(target.shortName)") {
+                    Button("with \(target.displayName)") {
                         appState.retranscribe(documentID: documentID, with: target)
                     }
                 }
