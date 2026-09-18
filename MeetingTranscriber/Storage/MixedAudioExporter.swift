@@ -207,12 +207,18 @@ enum MixedAudioExporter {
         return fileType == kAudioFileMP3Type
     }
 
-    private static func lameExecutableURL(fileManager: FileManager) -> URL? {
-        [
-            "/opt/homebrew/bin/lame",
-            "/usr/local/bin/lame"
+    static func lameExecutableURL(
+        bundleURL: URL = Bundle.main.bundleURL,
+        fileManager: FileManager = .default,
+        fallbackURLs: [URL] = [
+            URL(fileURLWithPath: "/opt/homebrew/bin/lame"),
+            URL(fileURLWithPath: "/usr/local/bin/lame")
         ]
-        .map { URL(fileURLWithPath: $0) }
+    ) -> URL? {
+        // Releases carry a self-contained encoder. Homebrew remains a convenience
+        // for source builds, which do not run the release packaging script.
+        let bundledURL = bundleURL.appendingPathComponent("Contents/Helpers/lame")
+        return ([bundledURL] + fallbackURLs)
         .first { fileManager.isExecutableFile(atPath: $0.path) }
     }
 
@@ -329,7 +335,7 @@ extension MixedAudioExporter {
             case .incompatibleStems:
                 return "The voice and system recordings use incompatible audio formats."
             case .mp3EncoderUnavailable:
-                return "MP3 export requires LAME. Install it with “brew install lame”, then relaunch Meeting Transcriber."
+                return "The MP3 encoder is missing. Download and reinstall the latest app release. For source builds, see the README."
             case .mp3EncodingFailed(let details):
                 return "Could not encode the MP3: \(details)"
             case .unsupportedAudioFormat:

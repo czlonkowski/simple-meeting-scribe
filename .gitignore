@@ -12,6 +12,7 @@ MeetingTranscriber.xcodeproj/*
 .swiftpm/
 xcuserdata/
 Package.resolved
+!scripts/release/Package.resolved
 
 # Generated app icons (regenerate with scripts/generate_app_icon.swift)
 MeetingTranscriber/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png
@@ -25,3 +26,6 @@ skills-lock.json
 # Release output
 dist/
 *.dmg
+
+# Local Python verification caches
+__pycache__/

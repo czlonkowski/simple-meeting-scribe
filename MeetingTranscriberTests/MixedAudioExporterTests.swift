@@ -42,6 +42,43 @@ final class MixedAudioExporterTests: XCTestCase {
         XCTAssertEqual(samples[2], -0.3675, accuracy: 0.002)
     }
 
+    func testBundledEncoderTakesPriorityOverHomebrew() throws {
+        let appURL = directoryURL.appendingPathComponent("Test App.app")
+        let bundledURL = appURL.appendingPathComponent("Contents/Helpers/lame")
+        let fallbackURL = directoryURL.appendingPathComponent("homebrew-lame")
+        try createExecutable(at: bundledURL)
+        try createExecutable(at: fallbackURL)
+
+        XCTAssertEqual(
+            MixedAudioExporter.lameExecutableURL(bundleURL: appURL, fallbackURLs: [fallbackURL]),
+            bundledURL
+        )
+    }
+
+    func testSourceBuildFallsBackWhenBundledEncoderIsNotExecutable() throws {
+        let appURL = directoryURL.appendingPathComponent("Test App.app")
+        let bundledURL = appURL.appendingPathComponent("Contents/Helpers/lame")
+        let fallbackURL = directoryURL.appendingPathComponent("homebrew-lame")
+        try createExecutable(at: bundledURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: bundledURL.path)
+        try createExecutable(at: fallbackURL)
+
+        XCTAssertEqual(
+            MixedAudioExporter.lameExecutableURL(bundleURL: appURL, fallbackURLs: [fallbackURL]),
+            fallbackURL
+        )
+    }
+
+    func testMissingEncoderReturnsNil() {
+        XCTAssertNil(MixedAudioExporter.lameExecutableURL(bundleURL: directoryURL, fallbackURLs: []))
+    }
+
+    private func createExecutable(at url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
     func testExportsCompressedMP3() throws {
         let encoderURL = try installedLAMEURL()
         let voiceURL = directoryURL.appendingPathComponent("voice.wav")
@@ -157,6 +194,12 @@ final class MixedAudioExporterTests: XCTestCase {
     }
 
     private func installedLAMEURL() throws -> URL {
+        // The release verifier exercises the exact encoder shipped in the DMG.
+        if let path = ProcessInfo.processInfo.environment["TEST_LAME_EXECUTABLE"] {
+            let url = URL(fileURLWithPath: path)
+            XCTAssertTrue(FileManager.default.isExecutableFile(atPath: url.path))
+            return url
+        }
         let candidates = [
             URL(fileURLWithPath: "/opt/homebrew/bin/lame"),
             URL(fileURLWithPath: "/usr/local/bin/lame")

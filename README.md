@@ -4,7 +4,7 @@ A personal, 100% local meeting transcriber for macOS. I built it for myself.
 I'm putting the source out there because other people asked — **not** because
 I'm trying to ship a product.
 
-There is no website, no installer, no support, no roadmap. If something
+There is no support commitment or roadmap. If something
 breaks, you fix it. If you want a feature, you add it. The project is MIT
 licensed; fork it, strip it, reshape it — it's yours.
 
@@ -30,14 +30,29 @@ licensed; fork it, strip it, reshape it — it's yours.
 
 ## What it does not do
 
-- No cloud. No telemetry. No account. No network calls except the first-run
-  downloads of Whisper / diarizer / LLM weights from Hugging Face.
-- No auto-update. No App Store. No notarized binary (build it yourself).
-- No tests. No CI. No documented API. No backwards-compatibility promise.
+- No telemetry or required app account. Local models download from Hugging Face;
+  optional Azure transcription/summarization uses your own credentials.
+- No auto-update. No App Store listing.
+- No CI or backwards-compatibility promise.
 - Not localised beyond English + Polish (the two languages I need).
 
-Everything happens on your machine. If the network is off, models already
-downloaded keep working.
+Local processing happens on your machine. If the network is off, models already
+downloaded keep working. Optional Azure features require a network connection.
+
+## Download the app
+
+Check [GitHub Releases](https://github.com/czlonkowski/simple-meeting-scribe/releases)
+for a signed, notarized `Simple-Meeting-Scribe-<version>-arm64.dmg`. If a release
+does not have a DMG yet, use the source build instructions below.
+
+1. Open the DMG and drag **MeetingTranscriber** into **Applications**.
+2. Open it from Applications and approve recording/Automation permissions when prompted.
+3. Download the local models you want to use. Initial downloads need internet access.
+
+The DMG includes the MP3 encoder; **Xcode and Homebrew are not required**.
+You need an **Apple Silicon Mac and macOS 26 or later**, plus space for models.
+To update, quit the app when you are not recording and replace it with the newer
+download. Maintainers: see [the release guide](docs/releases.md).
 
 ## Requirements
 
@@ -46,10 +61,10 @@ downloaded keep working.
   Apple Silicon.
 - macOS 26 Tahoe. The UI uses Liquid Glass, `@Observable`, and other
   macOS 26 APIs. Older macOS will not build.
-- Xcode 16+ and the Xcode Metal Toolchain (Xcode will prompt on first build,
+- For source builds: Xcode 26+ and the Xcode Metal Toolchain (Xcode will prompt on first build,
   or you can pre-install with `xcodebuild -downloadComponent MetalToolchain`).
-- [xcodegen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`.
-- [LAME](https://lame.sourceforge.io/) — `brew install lame` (used only when
+- For source builds: [xcodegen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`.
+- For source builds: [LAME](https://lame.sourceforge.io/) — `brew install lame` (used only when
   exporting a mixed meeting recording as MP3).
 - ~15 GB free disk space if you want to cache all the optional models.
 - 32 GB RAM recommended for the larger LLMs (Qwen3.5-9B, Bielik-11B). 16 GB
@@ -66,6 +81,7 @@ xcodebuild -project MeetingTranscriber.xcodeproj \
            -configuration Debug \
            -destination 'platform=macOS' \
            -skipMacroValidation \
+           CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM='' \
            build
 ```
 
@@ -83,7 +99,7 @@ still need to approve Xcode / Homebrew / sudo prompts as they come up.
 > at https://github.com/czlonkowski/simple-meeting-scribe. Do this end
 > to end:
 >
-> 1. Verify prerequisites: Apple Silicon, macOS 26 or newer, Xcode 16+
+> 1. Verify prerequisites: Apple Silicon, macOS 26 or newer, Xcode 26+
 >    installed. If Xcode Command Line Tools aren't installed, run
 >    `xcode-select --install` and wait for it to finish.
 > 2. Install xcodegen and LAME if missing: `brew install xcodegen lame` (install
@@ -99,6 +115,7 @@ still need to approve Xcode / Homebrew / sudo prompts as they come up.
 >    `xcodebuild -project MeetingTranscriber.xcodeproj
 >    -scheme MeetingTranscriber -configuration Release
 >    -destination 'platform=macOS' -skipMacroValidation
+>    CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=''
 >    -derivedDataPath build build`
 > 7. Install to /Applications (this needs sudo — ask me to run it if you
 >    can't):
@@ -126,10 +143,9 @@ still need to approve Xcode / Homebrew / sudo prompts as they come up.
 > them on first use. The CLI flag skips that prompt. In Xcode GUI, click
 > "Trust & Enable" on first build instead.
 
-Because the app is ad-hoc signed, macOS will treat each install path as a
-separate TCC identity. If you move the `.app` from DerivedData to
-`/Applications`, you'll be asked to re-grant Microphone + Screen Recording
-+ Automation (for browser AppleScript). This is macOS behaviour, not mine.
+The source-build commands above use ad-hoc signing. Rebuilding or moving that
+app can require granting Microphone, Screen Recording and Automation again.
+Published DMGs use a stable Developer ID signature.
 
 ## First run
 
