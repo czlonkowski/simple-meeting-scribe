@@ -69,15 +69,25 @@ enum TranscriptMerger {
         return (out, speakers)
     }
 
+    /// Level difference (dB) past which a segment's source overrides the
+    /// cloud speaker: only unambiguous cases, e.g. a muted mic or a silent
+    /// system stem. Talking over each other stays below it (checked on three
+    /// meetings: 10 dB flips correct double-talk labels, 20 dB only real errors).
+    static let decisiveStemMarginDB: Float = 20
+
     /// Map a single diarized transcription (the combined-mix cloud path) to
     /// app speakers. `diarization` is parallel to `segments` (one entry per
-    /// segment). `voiceActivity` — speech intervals from the mic stem — picks
-    /// out which diarized speaker is "You"; the rest become "Remote …" as in
-    /// `mergeStems`. With no usable mic activity (e.g. imported files) the
-    /// speakers are labeled "Speaker 1..N".
+    /// segment), and so is `stemLevels` when both stems exist.
+    ///
+    /// The system stem carries only remote audio, so stem levels decide which
+    /// cloud speaker is "You": the one whose speech is mostly louder on the mic.
+    /// The cloud's speaker identity is kept, except where one stem is louder by
+    /// `decisiveStemMarginDB` — that corrects a cloud speaker merging the user
+    /// with remote audio, or remote audio labelled as the user. Without stem
+    /// levels (imported files) speakers are labelled "Speaker 1..N".
     static func mapDiarizedSingle(segments: [WhisperSegment],
                                   diarization: [DiarizedSegment],
-                                  voiceActivity: [(start: Double, end: Double)])
+                                  stemLevels: [StemLevels]?)
         -> (segments: [TranscriptSegment], speakers: [SpeakerLabel]) {
 
         guard !segments.isEmpty else { return ([], []) }
@@ -89,53 +99,58 @@ enum TranscriptMerger {
             return (segs, [SpeakerLabel(id: 1, name: "Speaker 1")])
         }
 
-        // Per raw speaker: total speech time and overlap with mic activity.
-        var speechDur: [Int: Double] = [:]
-        var micOverlap: [Int: Double] = [:]
-        var firstSeen: [Int: Double] = [:]
-        for d in diarization {
-            speechDur[d.speakerId, default: 0] += d.end - d.start
-            if firstSeen[d.speakerId] == nil { firstSeen[d.speakerId] = d.start }
-            for v in voiceActivity {
-                micOverlap[d.speakerId, default: 0]
-                    += max(0, min(d.end, v.end) - max(d.start, v.start))
+        guard let levels = stemLevels, levels.count == segments.count else {
+            var idMap: [Int: Int] = [:]
+            var speakers: [SpeakerLabel] = []
+            let segs = zip(segments, diarization).map { seg, d in
+                if idMap[d.speakerId] == nil {
+                    idMap[d.speakerId] = idMap.count + 1
+                    speakers.append(SpeakerLabel(id: idMap.count, name: "Speaker \(idMap.count)"))
+                }
+                return TranscriptSegment(start: seg.start, end: seg.end,
+                                         speakerId: idMap[d.speakerId] ?? -1, text: seg.text)
             }
+            return (segs, speakers)
         }
 
-        // "You" = the speaker whose speech best coincides with mic activity.
-        // Requires a meaningful match so a silent user doesn't grab the label.
-        let youRawID: Int? = speechDur.keys
-            .map { id -> (id: Int, overlap: Double, ratio: Double) in
-                let overlap = micOverlap[id] ?? 0
-                return (id, overlap, overlap / max(speechDur[id] ?? 0, 0.001))
-            }
-            .filter { $0.overlap >= 2.0 && $0.ratio >= 0.4 }
-            .max(by: { $0.ratio < $1.ratio })?.id
+        // "You" = the cloud speaker whose speech is mostly louder on the mic.
+        var localTime: [Int: Double] = [:]
+        var totalTime: [Int: Double] = [:]
+        for (seg, (d, level)) in zip(segments, zip(diarization, levels)) {
+            let duration = seg.end - seg.start
+            totalTime[d.speakerId, default: 0] += duration
+            if level.mic > level.system { localTime[d.speakerId, default: 0] += duration }
+        }
+        let youRawID: Int? = totalTime
+            .map { (id: $0.key, fraction: (localTime[$0.key] ?? 0) / max($0.value, 0.001), time: $0.value) }
+            .filter { $0.fraction >= 0.5 }
+            .max { ($0.fraction, $0.time) < ($1.fraction, $1.time) }?.id
 
-        // Assign app ids in order of first appearance.
-        let rawInOrder = firstSeen.sorted { $0.value < $1.value }.map(\.key)
-        var idMap: [Int: Int] = [:]
+        // Remote speakers keyed by cloud id; the user's cloud id only shows up
+        // here for audio that was decisively remote (key `nil`).
+        var remoteKeys: [Int?] = []
+        let isLocal: [Bool] = zip(diarization, levels).map { d, level in
+            if level.mic - level.system >= decisiveStemMarginDB { return true }
+            if level.system - level.mic >= decisiveStemMarginDB { return false }
+            return d.speakerId == youRawID
+        }
+        for (d, local) in zip(diarization, isLocal) where !local {
+            let key: Int? = d.speakerId == youRawID ? nil : d.speakerId
+            if !remoteKeys.contains(key) { remoteKeys.append(key) }
+        }
+
         var speakers: [SpeakerLabel] = []
-        if let you = youRawID {
-            idMap[you] = 1
-            speakers.append(SpeakerLabel(id: 1, name: "You"))
-            let remotes = rawInOrder.filter { $0 != you }
-            for (offset, raw) in remotes.enumerated() {
-                idMap[raw] = offset + 2
-                speakers.append(SpeakerLabel(id: offset + 2,
-                                             name: remotes.count == 1 ? "Remote" : "Remote \(offset + 1)"))
-            }
-        } else {
-            for (offset, raw) in rawInOrder.enumerated() {
-                idMap[raw] = offset + 1
-                speakers.append(SpeakerLabel(id: offset + 1, name: "Speaker \(offset + 1)"))
-            }
+        if isLocal.contains(true) { speakers.append(SpeakerLabel(id: 1, name: "You")) }
+        for (offset, _) in remoteKeys.enumerated() {
+            speakers.append(SpeakerLabel(id: offset + 2,
+                                         name: remoteKeys.count == 1 ? "Remote" : "Remote \(offset + 1)"))
         }
 
-        let segs = zip(segments, diarization).map { seg, d in
-            TranscriptSegment(start: seg.start, end: seg.end,
-                              speakerId: idMap[d.speakerId] ?? -1,
-                              text: seg.text)
+        let segs = zip(segments, zip(diarization, isLocal)).map { seg, pair in
+            let (d, local) = pair
+            let key: Int? = d.speakerId == youRawID ? nil : d.speakerId
+            let id = local ? 1 : (remoteKeys.firstIndex(of: key).map { $0 + 2 } ?? -1)
+            return TranscriptSegment(start: seg.start, end: seg.end, speakerId: id, text: seg.text)
         }
         return (segs, speakers)
     }

@@ -35,8 +35,8 @@ final class TranscriptionPipeline {
             // Unlike the local engines, both stems go up as ONE combined mix:
             // the cloud diarization separates all speakers in a single call,
             // halving upload size and billed audio-minutes. The mic stem is
-            // still used locally to figure out which diarized speaker is
-            // "You". initialPrompt has no cloud equivalent and is ignored
+            // still used locally (stem levels) to figure out which diarized
+            // speaker is "You". initialPrompt has no cloud equivalent and is ignored
             // (MAI gets glossary `phraseHints` instead); word replacements
             // still apply as post-processing below.
             let apiKey: String
@@ -59,13 +59,11 @@ final class TranscriptionPipeline {
 
             let uploadURL: URL
             var mixCleanupURL: URL? = nil
-            var voiceActivity: [(start: Double, end: Double)] = []
             let diarize: Bool
             if let systemURL = systemURL {
                 progress(0.03, "Mixing stems")
                 uploadURL = try AudioMixdown.mixToTempWav(voice: voiceURL, system: systemURL)
                 mixCleanupURL = uploadURL
-                voiceActivity = (try? AudioMixdown.voiceActivityIntervals(in: voiceURL)) ?? []
                 diarize = true
             } else {
                 uploadURL = voiceURL
@@ -120,9 +118,14 @@ final class TranscriptionPipeline {
                     segs.append(s)
                     diar.append(d)
                 }
+                // Which stem each segment is loudest in tells the user apart
+                // from remote participants (see mapDiarizedSingle).
+                let levels = systemURL.flatMap {
+                    try? AudioMixdown.stemLevels(voice: voiceURL, system: $0, segments: segs)
+                }
                 merged = TranscriptMerger.mapDiarizedSingle(segments: segs,
                                                             diarization: diar,
-                                                            voiceActivity: voiceActivity)
+                                                            stemLevels: levels)
             } else {
                 let segs = result.segments.filter { $0.start < cutoff }
                 merged = TranscriptMerger.mergeStems(voice: segs,

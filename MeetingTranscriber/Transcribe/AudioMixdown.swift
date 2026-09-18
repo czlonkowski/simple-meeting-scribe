@@ -2,9 +2,9 @@ import Foundation
 import AVFoundation
 
 /// Mixes the two recorded stems into a single mono WAV for cloud
-/// transcription, and derives a voice-activity timeline from the mic stem so
+/// transcription, and measures each stem's level per transcript segment so
 /// the cloud engine's anonymous diarization speakers can be mapped back to
-/// "You". Local engines keep using the separate stems.
+/// "You" and remote participants. Local engines keep using the separate stems.
 enum AudioMixdown {
 
     /// Sample-wise sum of both stems (timeline-aligned by StemWriter; the
@@ -57,45 +57,33 @@ enum AudioMixdown {
         return outURL
     }
 
-    /// Intervals (seconds) where the mic stem carries speech, from a simple
-    /// adaptive RMS gate over 100 ms frames. Used to decide which diarized
-    /// speaker in the combined mix is the user.
-    static func voiceActivityIntervals(in url: URL) throws -> [(start: Double, end: Double)] {
-        let samples = try loadSamples(from: url)
-        let frame = 1600 // 100 ms @ 16 kHz
-        guard samples.count >= frame else { return [] }
+    /// Loudness of each stem over each segment, for telling local (mic) from
+    /// remote (system) speech in a transcript of the mix. Loads both stems.
+    static func stemLevels(voice voiceURL: URL, system systemURL: URL,
+                           segments: [WhisperSegment]) throws -> [StemLevels] {
+        stemLevels(voice: try loadSamples(from: voiceURL),
+                   system: try loadSamples(from: systemURL),
+                   sampleRate: 16_000,
+                   segments: segments)
+    }
 
-        var rms: [Float] = []
-        rms.reserveCapacity(samples.count / frame)
-        var i = 0
-        while i + frame <= samples.count {
-            var sum: Float = 0
-            for j in i..<(i + frame) { sum += samples[j] * samples[j] }
-            rms.append((sum / Float(frame)).squareRoot())
-            i += frame
+    /// RMS level in dBFS of each stem over each segment's time range, floored
+    /// at -120 dB for digital silence. Ranges past a stem's end read as silence.
+    static func stemLevels(voice: [Float], system: [Float], sampleRate: Double,
+                           segments: [WhisperSegment]) -> [StemLevels] {
+        func level(_ samples: [Float], _ start: Double, _ end: Double) -> Float {
+            let lower = max(0, min(samples.count, Int(start * sampleRate)))
+            let upper = max(lower, min(samples.count, Int(end * sampleRate)))
+            guard upper > lower else { return -120 }
+            var energy: Float = 0
+            for i in lower..<upper { energy += samples[i] * samples[i] }
+            let rms = (energy / Float(upper - lower)).squareRoot()
+            return max(-120, 20 * log10(rms))
         }
-
-        // Adaptive threshold: well above the noise floor (median), with an
-        // absolute lower bound so a hot noise floor doesn't gate everything in.
-        let sorted = rms.sorted()
-        let median = sorted[sorted.count / 2]
-        let threshold = max(0.012, median * 3)
-
-        var intervals: [(start: Double, end: Double)] = []
-        var activeStart: Double? = nil
-        for (idx, value) in rms.enumerated() {
-            let t = Double(idx) * 0.1
-            if value > threshold {
-                if activeStart == nil { activeStart = t }
-            } else if let start = activeStart {
-                intervals.append((start, t))
-                activeStart = nil
-            }
+        return segments.map {
+            StemLevels(mic: level(voice, $0.start, $0.end),
+                       system: level(system, $0.start, $0.end))
         }
-        if let start = activeStart {
-            intervals.append((start, Double(rms.count) * 0.1))
-        }
-        return intervals
     }
 
     /// Loads a 16 kHz mono WAV (our own stem format) as float samples.
@@ -112,3 +100,9 @@ enum AudioMixdown {
     }
 }
 
+/// Per-segment loudness (dBFS) of the mic and system stems. The system stem
+/// carries only remote audio, so whichever is louder says where speech came from.
+struct StemLevels: Hashable {
+    let mic: Float
+    let system: Float
+}
