@@ -11,12 +11,12 @@ struct MeetingJoinSheet: View {
         @Bindable var appState = appState
         VStack(spacing: 22) {
             VStack(spacing: Theme.space3) {
-                Image(systemName: "video.fill")
+                Image(systemName: meeting.symbolName)
                     .font(.system(size: sheetIconSize))
                     .foregroundStyle(.red)
                     .padding(10)
                     .glassEffect(.regular.tint(.red.opacity(0.15)), in: .circle)
-                Text("Meeting detected")
+                Text(meeting.isCall ? "Call detected" : "Meeting detected")
                     .font(.title2.weight(.semibold))
                     .tracking(-0.4)
                 Text(meeting.title)
@@ -50,7 +50,7 @@ struct MeetingJoinSheet: View {
             .help("Record the meeting's browser window as video")
 
             VStack(spacing: 10) {
-                Text("Record this meeting in:")
+                Text(meeting.isCall ? "Record this call in:" : "Record this meeting in:")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 

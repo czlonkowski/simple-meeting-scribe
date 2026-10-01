@@ -5,6 +5,8 @@ import AppKit
 
 private let recordScreenKey = "recordScreenByDefault"
 private let inputDeviceUIDKey = "preferredInputDeviceUID"
+private let autoRecordCallsKey = "autoRecordCalls"
+private let callLanguageKey = "callLanguage"
 
 @MainActor
 @Observable
@@ -34,6 +36,25 @@ final class AppState {
     func setRecordScreen(_ value: Bool) {
         recordScreen = value
         UserDefaults.standard.set(value, forKey: recordScreenKey)
+    }
+
+    /// Start recording on its own when a native call (WhatsApp, iPhone via
+    /// Continuity, …) is detected, instead of only proposing it. Calls are
+    /// answered fast and the proposal sheet is easy to miss. Stop stays manual.
+    var autoRecordCalls: Bool = UserDefaults.standard.object(forKey: autoRecordCallsKey) as? Bool ?? true
+
+    func setAutoRecordCalls(_ value: Bool) {
+        autoRecordCalls = value
+        UserDefaults.standard.set(value, forKey: autoRecordCallsKey)
+    }
+
+    /// Transcription language for auto-recorded calls; switchable mid-recording.
+    var callLanguage: TranscriptionLanguage =
+        UserDefaults.standard.string(forKey: callLanguageKey).flatMap(TranscriptionLanguage.init(rawValue:)) ?? .polish
+
+    func setCallLanguage(_ value: TranscriptionLanguage) {
+        callLanguage = value
+        UserDefaults.standard.set(value.rawValue, forKey: callLanguageKey)
     }
 
     /// Preferred microphone from Settings; nil follows the system default.
@@ -821,6 +842,7 @@ final class AppState {
 
     // Collaborators
     private var detector: MeetingDetector?
+    private var callDetector: CallDetector?
     private var recorder: RecordingCoordinator?
     private var elapsedTimer: Timer?
     private var longRecordingAlert = LongRecordingAlert()
@@ -868,6 +890,19 @@ final class AppState {
         }
         det.start()
         self.detector = det
+
+        let calls = CallDetector()
+        calls.onCallDetected = { [weak self] call in
+            guard let self, !self.recordingState.isBusy else { return }
+            if self.autoRecordCalls {
+                Task { await self.startRecording(language: self.callLanguage, meeting: call) }
+                LongRecordingNotifier.shared.postCallRecordingNotice(callName: call.title)
+            } else {
+                self.detectedMeeting = call
+            }
+        }
+        calls.start()
+        self.callDetector = calls
     }
 
     func dismissDetectedMeeting() {
@@ -938,6 +973,12 @@ final class AppState {
               let recorder else { return }
         if case .recording = videoCaptureStatus { return }
         await recorder.startVideo(meeting: meeting)
+    }
+
+    /// Language is only read when the recording stops, so it can change mid-call.
+    func setRecordingLanguage(_ language: TranscriptionLanguage) {
+        guard case .recording(let startedAt, let meeting, _) = recordingState else { return }
+        recordingState = .recording(startedAt: startedAt, meeting: meeting, language: language)
     }
 
     func setMicMuted(_ muted: Bool) {

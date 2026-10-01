@@ -22,6 +22,7 @@
 		2BBAC52BB8161EEE5E180C56 /* WordReplacementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD253098B51F28EB52CB220 /* WordReplacementService.swift */; };
 		2CEEF2595E69E677AEF89E33 /* ImportFileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DF34BD84516093E582B6AD /* ImportFileSheet.swift */; };
 		2E99110D5633D28565C2B15A /* MixerWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0100D04561D3DA136184D52 /* MixerWriter.swift */; };
+		340389F84DD5A415D748FEEA /* CallActivityTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA74B293F2A5E62A43E7C0F /* CallActivityTrackerTests.swift */; };
 		340D07201831E00D197E1F02 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747B97F80070E768617576E9 /* MCPTools.swift */; };
 		34DF45DFF7A8567BA2A8D539 /* MeetingTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78BB74557480491478111DD /* MeetingTranscriberApp.swift */; };
 		372BE3AE343ECE4A90D30F6E /* TagStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7553778A8A8B77A6E443E32C /* TagStore.swift */; };
@@ -44,6 +45,7 @@
 		5F46A90CD6DE58749E947F6F /* meeting-patterns.json in Resources */ = {isa = PBXBuildFile; fileRef = 9580D9A82FEF7CAA918C1603 /* meeting-patterns.json */; };
 		5F808BED96B2FF68BB1F8CFD /* SummarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786FFF93E02176FD8FE629D7 /* SummarizationEngine.swift */; };
 		60998E73BAF2DC7311282ADE /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CBCA74D37875EDD1433BCF /* MeetingDetector.swift */; };
+		63967859598B595EC4976361 /* CallActivityTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03945A0B6B94DF60C96EA71 /* CallActivityTracker.swift */; };
 		643785A6A98C4C07BBFEA89A /* MAITranscribeEngineLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD3F9EA94001A3B77013503 /* MAITranscribeEngineLiveTests.swift */; };
 		65CF28EAD34E2693E52BBF81 /* SystemAudioHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9522066AD2C772F887AEBA34 /* SystemAudioHealthTests.swift */; };
 		66407E8C799AC339A6CCEE49 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 0776F4BCF2B813ACC5E0CC42 /* HuggingFace */; };
@@ -70,6 +72,8 @@
 		A3EEF01BC86F4412AD0CF2F4 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 83824903C28D6B7CD12C27C1 /* MLXLMCommon */; };
 		A4EDB35392CFE4215DF3A890 /* MAITranscribeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7C63070B950873957610F6 /* MAITranscribeEngineTests.swift */; };
 		A5846FBDEF3A1A2D7911C7D6 /* WhisperModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D14FDA8F76E58108013778 /* WhisperModelTests.swift */; };
+		ABD85CB20F3E993333F0059D /* ProcessTapCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F881BD3389456402BCA57F3 /* ProcessTapCapture.swift */; };
+		AC9458F090E3D3F05365D22E /* CallDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5326FFABE9D1100D50DB4219 /* CallDetector.swift */; };
 		B01D40A9F2C2EB99D2DF5627 /* VideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6ABDE44BDC61598CB0A80C1 /* VideoPlayerCard.swift */; };
 		B151921D3FA726B089472344 /* MAITranscribeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBFADA68838C24760DEA6F9 /* MAITranscribeEngine.swift */; };
 		B1A5B750B00EA334733BD1BB /* ParakeetSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2C969565FB5B3E017B55F7 /* ParakeetSegmenter.swift */; };
@@ -134,8 +138,10 @@
 		4D816383958DA1C80FFB3FF1 /* SummaryPass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryPass.swift; sourceTree = "<group>"; };
 		4F7C63070B950873957610F6 /* MAITranscribeEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MAITranscribeEngineTests.swift; sourceTree = "<group>"; };
 		50878A9F431694BAFD646321 /* TranscriptDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDetailView.swift; sourceTree = "<group>"; };
+		5326FFABE9D1100D50DB4219 /* CallDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallDetector.swift; sourceTree = "<group>"; };
 		5861A952DB8166D0C30E7D34 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5BBFADA68838C24760DEA6F9 /* MAITranscribeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MAITranscribeEngine.swift; sourceTree = "<group>"; };
+		5F881BD3389456402BCA57F3 /* ProcessTapCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTapCapture.swift; sourceTree = "<group>"; };
 		628FC3EB4444FF503DC407A7 /* MixedAudioExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixedAudioExporter.swift; sourceTree = "<group>"; };
 		64005F4AC02855F2487ED608 /* ScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecorder.swift; sourceTree = "<group>"; };
 		6602515950B34F876B321764 /* TranscriptionPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipeline.swift; sourceTree = "<group>"; };
@@ -146,6 +152,7 @@
 		76816121BD438F63E611FAEB /* AzureOpenAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureOpenAIClient.swift; sourceTree = "<group>"; };
 		786FFF93E02176FD8FE629D7 /* SummarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummarizationEngine.swift; sourceTree = "<group>"; };
 		796D2B939DC45511BCCF3BAC /* SummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryStore.swift; sourceTree = "<group>"; };
+		7AA74B293F2A5E62A43E7C0F /* CallActivityTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallActivityTrackerTests.swift; sourceTree = "<group>"; };
 		85B1F17182686AEEE558E198 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorderLiveTests.swift; sourceTree = "<group>"; };
 		86C8072DD9DA5CE0CB00722E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -177,6 +184,7 @@
 		D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDeviceSelectionTests.swift; sourceTree = "<group>"; };
 		D9CDCBE17C1A2116FDE64DE7 /* Text+Markdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Text+Markdown.swift"; sourceTree = "<group>"; };
 		E0100D04561D3DA136184D52 /* MixerWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerWriter.swift; sourceTree = "<group>"; };
+		E03945A0B6B94DF60C96EA71 /* CallActivityTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallActivityTracker.swift; sourceTree = "<group>"; };
 		E10D3F1324A0298AA3CA60C3 /* TranscriptFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptFormatter.swift; sourceTree = "<group>"; };
 		E78BB74557480491478111DD /* MeetingTranscriberApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingTranscriberApp.swift; sourceTree = "<group>"; };
 		F105B4670016A20D4E3C3232 /* AudioMixdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMixdown.swift; sourceTree = "<group>"; };
@@ -293,6 +301,7 @@
 			children = (
 				863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */,
 				7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */,
+				7AA74B293F2A5E62A43E7C0F /* CallActivityTrackerTests.swift */,
 				A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */,
 				D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */,
 				398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */,
@@ -379,10 +388,13 @@
 			children = (
 				956B473FF8328A5939AFAC93 /* AudioRecorder.swift */,
 				A31CAE064B962477AD977CB2 /* BrowserURLQuery.swift */,
+				E03945A0B6B94DF60C96EA71 /* CallActivityTracker.swift */,
+				5326FFABE9D1100D50DB4219 /* CallDetector.swift */,
 				34215358EE13E745C5772DB8 /* InputDeviceSelection.swift */,
 				30CBCA74D37875EDD1433BCF /* MeetingDetector.swift */,
 				FDCE3FA48709D76E22D398E1 /* MicHealth.swift */,
 				E0100D04561D3DA136184D52 /* MixerWriter.swift */,
+				5F881BD3389456402BCA57F3 /* ProcessTapCapture.swift */,
 				159BFB364327253A27D37567 /* RecordingCoordinator.swift */,
 				64005F4AC02855F2487ED608 /* ScreenRecorder.swift */,
 				1C72F83AAB72FB3D681FAF15 /* SystemAudioCapture.swift */,
@@ -507,6 +519,7 @@
 			files = (
 				7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */,
 				A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */,
+				340389F84DD5A415D748FEEA /* CallActivityTrackerTests.swift in Sources */,
 				16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */,
 				B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */,
 				A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */,
@@ -537,6 +550,8 @@
 				779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */,
 				572307D9BDF9EAFC77050A95 /* AzureOpenAIClient.swift in Sources */,
 				8CDE1BB3AA1C09720FAF1868 /* BrowserURLQuery.swift in Sources */,
+				63967859598B595EC4976361 /* CallActivityTracker.swift in Sources */,
+				AC9458F090E3D3F05365D22E /* CallDetector.swift in Sources */,
 				C5986FA66B79453646B53B7D /* DiarizationEngine.swift in Sources */,
 				507944D8E868E78874A1D649 /* DictionaryStore.swift in Sources */,
 				2CEEF2595E69E677AEF89E33 /* ImportFileSheet.swift in Sources */,
@@ -561,6 +576,7 @@
 				4E6A0B28D4EB14C7CB0FA488 /* Models.swift in Sources */,
 				9EBEDAB8745E070C6B1CBF74 /* ParakeetEngine.swift in Sources */,
 				B1A5B750B00EA334733BD1BB /* ParakeetSegmenter.swift in Sources */,
+				ABD85CB20F3E993333F0059D /* ProcessTapCapture.swift in Sources */,
 				4284E5DF07B438BFFDBA023B /* RecordView.swift in Sources */,
 				C64833D83A5AF134F82AB534 /* RecordingCoordinator.swift in Sources */,
 				DAF20D738FE4935C93466CF3 /* RootView.swift in Sources */,

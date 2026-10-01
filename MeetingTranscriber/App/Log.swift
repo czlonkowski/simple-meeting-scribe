@@ -17,4 +17,5 @@ enum Log {
     static let systemAudio   = Logger(subsystem: subsystem, category: "systemAudio")
     static let summary       = Logger(subsystem: subsystem, category: "summary")
     static let browserDetection = Logger(subsystem: subsystem, category: "browserDetection")
+    static let callDetection = Logger(subsystem: subsystem, category: "callDetection")
 }

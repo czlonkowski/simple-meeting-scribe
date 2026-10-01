@@ -101,11 +101,24 @@ private struct GeneralSettingsView: View {
                     get: { state.recordScreen },
                     set: { state.setRecordScreen($0) }
                 ))
+                Toggle("Record calls automatically", isOn: Binding(
+                    get: { state.autoRecordCalls },
+                    set: { state.setAutoRecordCalls($0) }
+                ))
+                .help("WhatsApp, iPhone calls answered on this Mac, Signal, Telegram, and native Zoom, Teams or Slack calls")
+                Picker("Call language", selection: Binding(
+                    get: { state.callLanguage },
+                    set: { state.setCallLanguage($0) }
+                )) {
+                    ForEach(TranscriptionLanguage.allCases) { l in
+                        Text("\(l.flag) \(l.displayName)").tag(l)
+                    }
+                }
             } header: {
                 Text("Capture")
                     .font(Theme.sectionTitleFont)
             } footer: {
-                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only.")
+                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only. Calls are detected when a call app uses the mic and speakers for a few seconds; with automatic recording off, you get a prompt instead. Stopping is always manual.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -57,6 +57,19 @@ final class LongRecordingNotifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Auto-started call recordings announce themselves: the app is usually in
+    /// the background while a call is answered.
+    func postCallRecordingNotice(callName: String) {
+        prepare()
+        let content = UNMutableNotificationContent()
+        content.title = "Recording \(callName)"
+        content.body = "Transcription starts when you stop the recording."
+        let request = UNNotificationRequest(identifier: "call-recording",
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler:

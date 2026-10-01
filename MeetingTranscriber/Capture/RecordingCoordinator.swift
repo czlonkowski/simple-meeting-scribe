@@ -16,6 +16,7 @@ struct RecordedStems {
 final class RecordingCoordinator {
     private let mic = AudioRecorder()
     private let system = SystemAudioCapture()
+    private var callTap: ProcessTapCapture?
     private let screen = ScreenRecorder()
     private var writer: StemWriter?
     private var captureSystem = false
@@ -52,7 +53,21 @@ final class RecordingCoordinator {
         try mic.start()
         micStartDate = Date()
 
-        if captureSystemAudio {
+        if captureSystemAudio, let names = meeting?.tapProcessNames, !names.isEmpty {
+            let tap = ProcessTapCapture(executableNames: names)
+            tap.onSamples = { [weak writer] samples in
+                guard let writer else { return }
+                await writer.appendSystem(samples)
+            }
+            tap.onLevel = onSystemLevel
+            do {
+                try tap.start()
+                callTap = tap
+            } catch {
+                Log.systemAudio.error("call tap failed (continuing mic-only): \(error.localizedDescription, privacy: .public)")
+                self.captureSystem = false
+            }
+        } else if captureSystemAudio {
             system.onSamples = { [weak writer] samples in
                 guard let writer else { return }
                 await writer.appendSystem(samples)
@@ -112,7 +127,12 @@ final class RecordingCoordinator {
 
     func stop() async throws -> RecordedStems {
         mic.stop()
-        if captureSystem { await system.stop() }
+        if let callTap {
+            callTap.stop()
+            self.callTap = nil
+        } else if captureSystem {
+            await system.stop()
+        }
         let videoURL = await screen.stop()
         guard let writer else {
             throw NSError(domain: "RecordingCoordinator", code: 1)

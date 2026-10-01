@@ -83,6 +83,13 @@ struct DetectedMeeting: Equatable, Hashable, Identifiable {
     /// Bundle ID of the browser whose tab matched (e.g. Arc). Lets the screen
     /// recorder find the window hosting the meeting.
     var browserBundleID: String? = nil
+    /// For calls whose remote audio ScreenCaptureKit can't capture: the
+    /// processes to record with a Core Audio process tap instead.
+    var tapProcessNames: [String] = []
+
+    /// Native voice call from `CallDetector` rather than a browser meeting.
+    var isCall: Bool { url.hasPrefix("call://") }
+    var symbolName: String { isCall ? "phone.fill" : "video.fill" }
 
     static func == (lhs: DetectedMeeting, rhs: DetectedMeeting) -> Bool {
         lhs.url == rhs.url

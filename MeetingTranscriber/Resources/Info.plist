@@ -32,6 +32,8 @@
 	<false/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Meeting Transcriber asks Arc, Safari, and Chrome for the current tab URL to detect meetings you join.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Meeting Transcriber records the other side of phone and FaceTime calls you take on this Mac.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>Needed only if you import files from the Desktop.</string>
 	<key>NSDocumentsFolderUsageDescription</key>

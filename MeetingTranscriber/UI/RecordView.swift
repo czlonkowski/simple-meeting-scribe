@@ -118,11 +118,21 @@ struct RecordView: View {
                     .contentTransition(.numericText())
                 if let meeting {
                     Text("·").foregroundStyle(.tertiary)
-                    Label(meeting.title, systemImage: "video.fill")
+                    Label(meeting.title, systemImage: meeting.symbolName)
                         .labelStyle(.titleAndIcon)
                 }
                 Text("·").foregroundStyle(.tertiary)
-                Text("\(language.flag) \(language.displayName)")
+                Menu("\(language.flag) \(language.displayName)") {
+                    ForEach(TranscriptionLanguage.allCases) { option in
+                        Button("\(option.flag) \(option.displayName)") {
+                            appState.setRecordingLanguage(option)
+                        }
+                    }
+                }
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+                .fixedSize()
+                .help("Transcription language — applied when the recording stops")
                 if let mic = appState.currentInputDeviceName {
                     Text("·").foregroundStyle(.tertiary)
                     Label(mic, systemImage: "mic.fill")
