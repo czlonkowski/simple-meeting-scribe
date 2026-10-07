@@ -23,6 +23,9 @@ struct CallApp: Equatable, Sendable {
     /// audio ScreenCaptureKit cannot see. Empty = the normal system stem.
     var tapExecutableNames: [String] = []
 
+    /// Placeholder transcript title for a recording of this app's call.
+    var callTitle: String { "\(name) call" }
+
     func matches(_ client: AudioClientSnapshot) -> Bool {
         let bundle = client.bundleID.lowercased()
         if bundleIDPrefixes.contains(where: { bundle.hasPrefix($0.lowercased()) }) { return true }

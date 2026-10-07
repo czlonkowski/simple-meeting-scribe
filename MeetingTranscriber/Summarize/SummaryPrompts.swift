@@ -113,6 +113,31 @@ enum SummaryPrompts {
         }
     }
 
+    /// Decide whether we're allowed to overwrite the transcript title with
+    /// an LLM-generated one. User-edited titles are preserved; the auto-
+    /// generated fallbacks are not.
+    ///
+    /// The fallbacks we recognise:
+    /// • `"Recording — <date>"` for unnamed live recordings
+    /// • `"Google Meet — <slug>"` / Zoom / Teams / Whereby for meeting drops
+    /// • `"WhatsApp call"` / `"Phone call"` / … from `CallDetector`
+    /// • The raw imported filename (from `sourceURL`) — or anything ending in
+    ///   a common audio/video extension, as a belt-and-suspenders catch
+    static func isPlaceholderTitle(_ current: String, sourceFilename: String?) -> Bool {
+        let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if trimmed.hasPrefix("Recording — ") { return true }
+        let meetingPrefixes = ["Google Meet — ", "Zoom — ", "Teams — ", "Whereby — "]
+        if meetingPrefixes.contains(where: trimmed.hasPrefix) { return true }
+        if CallApp.defaults.contains(where: { trimmed == $0.callTitle }) { return true }
+        if let sourceFilename, trimmed == sourceFilename { return true }
+        let audioVideoExts = [".m4a", ".mp3", ".mp4", ".mov", ".wav",
+                              ".mpeg", ".mpeg4", ".aif", ".aiff", ".flac", ".webm"]
+        let lower = trimmed.lowercased()
+        if audioVideoExts.contains(where: lower.hasSuffix) { return true }
+        return false
+    }
+
     /// Clean up a model-generated title: strip quotes, markdown, trailing
     /// punctuation, and collapse to the first line (models sometimes leak
     /// explanations below the answer).

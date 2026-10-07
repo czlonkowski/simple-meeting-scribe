@@ -53,7 +53,7 @@ final class CallDetector {
         for call in tracker.update(clients: snapshot, at: Date()) {
             Log.callDetection.notice("call detected: \(call.app.name, privacy: .public)")
             onCallDetected?(DetectedMeeting(
-                title: "\(call.app.name) call",
+                title: call.app.callTitle,
                 platform: call.app.name,
                 url: "call://\(call.app.windowBundleID)/\(Int(call.startedAt.timeIntervalSince1970))",
                 detectedAt: call.startedAt,
