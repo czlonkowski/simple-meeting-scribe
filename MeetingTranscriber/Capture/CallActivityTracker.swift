@@ -22,6 +22,9 @@ struct CallApp: Equatable, Sendable {
     /// Processes whose output is the remote side of the call, for apps whose
     /// audio ScreenCaptureKit cannot see. Empty = the normal system stem.
     var tapExecutableNames: [String] = []
+    /// Whether the app going quiet means the call is over. Verified for the
+    /// apps that set it; conferencing apps may release audio mid-meeting.
+    var hangUpIsDetectable = false
 
     /// Placeholder transcript title for a recording of this app's call.
     var callTitle: String { "\(name) call" }
@@ -35,7 +38,8 @@ struct CallApp: Equatable, Sendable {
 
     static let defaults: [CallApp] = [
         CallApp(name: "WhatsApp", bundleIDPrefixes: ["net.whatsapp."],
-                windowBundleID: "net.whatsapp.WhatsApp"),
+                windowBundleID: "net.whatsapp.WhatsApp",
+                hangUpIsDetectable: true),
         // iPhone calls relayed through Continuity are carried by the
         // telephony/conferencing daemons, not by FaceTime.app itself.
         // Verified on a live call 2026-10-01: `avconferenced` runs mic + speaker
@@ -43,7 +47,8 @@ struct CallApp: Equatable, Sendable {
         CallApp(name: "Phone", bundleIDPrefixes: ["com.apple.avconferenced", "com.apple.FaceTime"],
                 executableNames: ["avconferenced"],
                 windowBundleID: "com.apple.FaceTime",
-                tapExecutableNames: ["avconferenced"]),
+                tapExecutableNames: ["avconferenced"],
+                hangUpIsDetectable: true),
         CallApp(name: "Signal", bundleIDPrefixes: ["org.whispersystems.signal-desktop"],
                 windowBundleID: "org.whispersystems.signal-desktop"),
         CallApp(name: "Telegram", bundleIDPrefixes: ["ru.keepcoder.Telegram"],
@@ -63,6 +68,10 @@ struct CallApp: Equatable, Sendable {
 /// notes and dictation (input only) and message playback (output only); the
 /// delay rejects the ringtone and call-preview blips. A call ends — and the app
 /// becomes eligible to trigger again — once it stops capturing the mic.
+///
+/// Separately, `endedCalls` reports a hang-up: an app that was in a two-way
+/// state and has used neither mic nor speaker for `endGrace`. Needing both
+/// directions quiet keeps a muted mic or a silent line from ending the call.
 struct CallActivityTracker {
     struct CallStart: Equatable {
         let app: CallApp
@@ -76,6 +85,12 @@ struct CallActivityTracker {
     private var twoWaySince: [String: Date] = [:]
     /// Apps already reported whose mic capture hasn't stopped yet.
     private var reported: Set<String> = []
+    /// How long an app must stay off both mic and speaker to count as hung up.
+    var endGrace: TimeInterval = 5
+    /// Apps seen in a two-way state that haven't hung up yet.
+    private var live: Set<String> = []
+    /// When each live app was first seen using neither mic nor speaker.
+    private var quietSince: [String: Date] = [:]
 
     init(apps: [CallApp] = CallApp.defaults, minimumDuration: TimeInterval = 3) {
         self.apps = apps
@@ -104,5 +119,39 @@ struct CallActivityTracker {
             }
         }
         return starts
+    }
+
+    /// Apps whose call ended: live ones quiet in both directions for
+    /// `endGrace`. Each hang-up is returned once. Call on every poll.
+    mutating func endedCalls(clients: [AudioClientSnapshot], at now: Date) -> [CallApp] {
+        var ended: [CallApp] = []
+        for app in apps where app.hangUpIsDetectable {
+            let mine = clients.filter(app.matches)
+            let capturing = mine.contains(where: \.isRunningInput)
+            let playing = mine.contains(where: \.isRunningOutput)
+            if capturing && playing { live.insert(app.name) }
+            guard live.contains(app.name), !capturing, !playing else {
+                quietSince[app.name] = nil
+                continue
+            }
+            let since = quietSince[app.name] ?? now
+            quietSince[app.name] = since
+            if now.timeIntervalSince(since) >= endGrace {
+                live.remove(app.name)
+                quietSince[app.name] = nil
+                ended.append(app)
+            }
+        }
+        return ended
+    }
+
+    /// Calls in progress in `clients`, whether or not they were reported
+    /// already. Lets a recording that starts mid-call pick the call up.
+    func activeCalls(clients: [AudioClientSnapshot], at now: Date) -> [CallStart] {
+        apps.compactMap { app in
+            let mine = clients.filter(app.matches)
+            guard mine.contains(where: \.isRunningInput), mine.contains(where: \.isRunningOutput) else { return nil }
+            return CallStart(app: app, startedAt: twoWaySince[app.name] ?? now)
+        }
     }
 }

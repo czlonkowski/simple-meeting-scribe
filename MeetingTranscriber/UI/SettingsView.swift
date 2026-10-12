@@ -106,6 +106,11 @@ private struct GeneralSettingsView: View {
                     set: { state.setAutoRecordCalls($0) }
                 ))
                 .help("WhatsApp, iPhone calls answered on this Mac, Signal, Telegram, and native Zoom, Teams or Slack calls")
+                Toggle("Stop when the call ends", isOn: Binding(
+                    get: { state.autoStopCalls },
+                    set: { state.setAutoStopCalls($0) }
+                ))
+                .help("WhatsApp and iPhone calls. Other call apps are stopped by hand.")
                 Picker("Call language", selection: Binding(
                     get: { state.callLanguage },
                     set: { state.setCallLanguage($0) }
@@ -118,7 +123,7 @@ private struct GeneralSettingsView: View {
                 Text("Capture")
                     .font(Theme.sectionTitleFont)
             } footer: {
-                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only. Calls are detected when a call app uses the mic and speakers for a few seconds; with automatic recording off, you get a prompt instead. Stopping is always manual.")
+                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only. Calls are detected when a call app uses the mic and speakers for a few seconds; with automatic recording off, you get a prompt instead. A WhatsApp or iPhone call recording stops by itself a few seconds after the call hangs up; everything else is stopped by hand.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

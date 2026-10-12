@@ -7,6 +7,7 @@ private let recordScreenKey = "recordScreenByDefault"
 private let inputDeviceUIDKey = "preferredInputDeviceUID"
 private let autoRecordCallsKey = "autoRecordCalls"
 private let callLanguageKey = "callLanguage"
+private let autoStopCallsKey = "autoStopCalls"
 
 @MainActor
 @Observable
@@ -40,12 +41,20 @@ final class AppState {
 
     /// Start recording on its own when a native call (WhatsApp, iPhone via
     /// Continuity, …) is detected, instead of only proposing it. Calls are
-    /// answered fast and the proposal sheet is easy to miss. Stop stays manual.
+    /// answered fast and the proposal sheet is easy to miss.
     var autoRecordCalls: Bool = UserDefaults.standard.object(forKey: autoRecordCallsKey) as? Bool ?? true
 
     func setAutoRecordCalls(_ value: Bool) {
         autoRecordCalls = value
         UserDefaults.standard.set(value, forKey: autoRecordCallsKey)
+    }
+
+    /// Stop a call recording on its own when the call app hangs up.
+    var autoStopCalls: Bool = UserDefaults.standard.object(forKey: autoStopCallsKey) as? Bool ?? true
+
+    func setAutoStopCalls(_ value: Bool) {
+        autoStopCalls = value
+        UserDefaults.standard.set(value, forKey: autoStopCallsKey)
     }
 
     /// Transcription language for auto-recorded calls; switchable mid-recording.
@@ -878,6 +887,14 @@ final class AppState {
                 self.detectedMeeting = call
             }
         }
+        calls.onCallEnded = { [weak self] platform in
+            guard let self, self.autoStopCalls,
+                  case .recording(_, let meeting?, _) = self.recordingState,
+                  meeting.isCall, meeting.platform == platform else { return }
+            Log.callDetection.notice("stopping recording: \(platform, privacy: .public) hung up")
+            LongRecordingNotifier.shared.postCallEndedNotice(callName: meeting.title)
+            Task { await self.stopRecording() }
+        }
         calls.start()
         self.callDetector = calls
     }
@@ -892,6 +909,14 @@ final class AppState {
     // MARK: – Recording lifecycle
     func startRecording(language: TranscriptionLanguage, meeting: DetectedMeeting?) async {
         guard case .idle = recordingState else { return }
+        // A recording started by hand in the middle of a call is still a call
+        // recording: without the call, an iPhone call's remote side (played by
+        // avconferenced) is recorded as silence.
+        var meeting = meeting
+        if meeting == nil, let call = callDetector?.activeCall() {
+            Log.callDetection.notice("recording joins call in progress: \(call.platform, privacy: .public)")
+            meeting = call
+        }
         recordingState = .preparing
         currentMicRMS = 0
         currentSystemRMS = 0

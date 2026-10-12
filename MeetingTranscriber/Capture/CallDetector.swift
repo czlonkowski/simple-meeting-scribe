@@ -17,6 +17,10 @@ final class CallDetector {
     private var pollTask: Task<Void, Never>?
 
     var onCallDetected: ((DetectedMeeting) -> Void)?
+    /// A call app hung up; the argument is its `DetectedMeeting.platform`.
+    var onCallEnded: ((String) -> Void)?
+    /// Last logged mic/speaker use per call app, to log changes only.
+    private var loggedActivity: [String: String] = [:]
 
     init(
         tracker: CallActivityTracker = CallActivityTracker(),
@@ -48,19 +52,47 @@ final class CallDetector {
         pollTask = nil
     }
 
+    /// The call running right now, if any. Unlike `onCallDetected` this also
+    /// answers for a call that was already reported or is too young to be.
+    func activeCall() -> DetectedMeeting? {
+        tracker.activeCalls(clients: clients(), at: Date()).first.map(meeting)
+    }
+
     private func pollOnce() {
         let snapshot = clients()
         for call in tracker.update(clients: snapshot, at: Date()) {
             Log.callDetection.notice("call detected: \(call.app.name, privacy: .public)")
-            onCallDetected?(DetectedMeeting(
-                title: call.app.callTitle,
-                platform: call.app.name,
-                url: "call://\(call.app.windowBundleID)/\(Int(call.startedAt.timeIntervalSince1970))",
-                detectedAt: call.startedAt,
-                browserBundleID: call.app.windowBundleID,
-                tapProcessNames: call.app.tapExecutableNames
-            ))
+            onCallDetected?(meeting(for: call))
         }
+        for app in tracker.endedCalls(clients: snapshot, at: Date()) {
+            Log.callDetection.notice("call ended: \(app.name, privacy: .public)")
+            onCallEnded?(app.name)
+        }
+        logActivityChanges(in: snapshot)
+    }
+
+    /// One line per change in a call app's mic/speaker use — the raw signal
+    /// behind start and hang-up detection, for checking it against real calls.
+    private func logActivityChanges(in snapshot: [AudioClientSnapshot]) {
+        for app in tracker.apps {
+            let mine = snapshot.filter(app.matches)
+            let activity = "mic=\(mine.contains(where: \.isRunningInput)) speaker=\(mine.contains(where: \.isRunningOutput))"
+            let previous = loggedActivity[app.name] ?? "mic=false speaker=false"
+            guard activity != previous else { continue }
+            loggedActivity[app.name] = activity
+            Log.callDetection.notice("\(app.name, privacy: .public): \(activity, privacy: .public)")
+        }
+    }
+
+    private func meeting(for call: CallActivityTracker.CallStart) -> DetectedMeeting {
+        DetectedMeeting(
+            title: call.app.callTitle,
+            platform: call.app.name,
+            url: "call://\(call.app.windowBundleID)/\(Int(call.startedAt.timeIntervalSince1970))",
+            detectedAt: call.startedAt,
+            browserBundleID: call.app.windowBundleID,
+            tapProcessNames: call.app.tapExecutableNames
+        )
     }
 }
 

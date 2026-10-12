@@ -63,7 +63,19 @@ final class LongRecordingNotifier: NSObject, UNUserNotificationCenterDelegate {
         prepare()
         let content = UNMutableNotificationContent()
         content.title = "Recording \(callName)"
-        content.body = "Transcription starts when you stop the recording."
+        content.body = "Transcription starts when the call ends or you stop the recording."
+        let request = UNNotificationRequest(identifier: "call-recording",
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The call hung up and its recording was stopped without the user.
+    func postCallEndedNotice(callName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(callName) ended"
+        content.body = "Recording stopped. Transcribing…"
+        // Same identifier: replaces the "Recording …" banner of this call.
         let request = UNNotificationRequest(identifier: "call-recording",
                                             content: content,
                                             trigger: nil)

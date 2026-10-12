@@ -22,6 +22,60 @@ final class CallActivityTrackerTests: XCTestCase {
         XCTAssertTrue(tracker.update(clients: call, at: t0 + 60).isEmpty)
     }
 
+    func testActiveCallsIncludeCallsAlreadyReportedOrStillTooYoung() {
+        var tracker = CallActivityTracker()
+        let call = [client("", input: true, output: true, path: "/usr/libexec/avconferenced")]
+        XCTAssertTrue(tracker.activeCalls(clients: [], at: t0).isEmpty)
+        // Seen in a poll but younger than the minimum duration.
+        _ = tracker.update(clients: call, at: t0)
+        XCTAssertEqual(tracker.activeCalls(clients: call, at: t0 + 1).map(\.app.name), ["Phone"])
+        // Reported long ago: `update` stays quiet, the call is still active.
+        _ = tracker.update(clients: call, at: t0 + 3)
+        XCTAssertTrue(tracker.update(clients: call, at: t0 + 60).isEmpty)
+        let active = tracker.activeCalls(clients: call, at: t0 + 60)
+        XCTAssertEqual(active.first?.startedAt, t0)
+        XCTAssertEqual(active.first?.app.tapExecutableNames, ["avconferenced"])
+        // One direction only is not a call.
+        let playback = [client("", input: false, output: true, path: "/usr/libexec/avconferenced")]
+        XCTAssertTrue(tracker.activeCalls(clients: playback, at: t0 + 61).isEmpty)
+    }
+
+    func testHangUpIsReportedOnceAfterBothDirectionsStayQuiet() {
+        var tracker = CallActivityTracker()
+        let call = [client("net.whatsapp.WhatsApp", input: true, output: true)]
+        XCTAssertTrue(tracker.endedCalls(clients: call, at: t0).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 10).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 14).isEmpty)
+        XCTAssertEqual(tracker.endedCalls(clients: [], at: t0 + 15).map(\.name), ["WhatsApp"])
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 60).isEmpty)
+    }
+
+    func testMutedMicOrBriefDropoutDoesNotEndTheCall() {
+        var tracker = CallActivityTracker()
+        let call = [client("net.whatsapp.WhatsApp", input: true, output: true)]
+        let muted = [client("net.whatsapp.WhatsApp", input: false, output: true)]
+        _ = tracker.endedCalls(clients: call, at: t0)
+        // One direction still running, however long.
+        XCTAssertTrue(tracker.endedCalls(clients: muted, at: t0 + 10).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: muted, at: t0 + 300).isEmpty)
+        // Quiet for less than the grace period, then back.
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 301).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: call, at: t0 + 304).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 305).isEmpty)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 309).isEmpty)
+        XCTAssertEqual(tracker.endedCalls(clients: [], at: t0 + 310).count, 1)
+    }
+
+    func testHangUpNeedsACallFirstAndADetectableApp() {
+        var tracker = CallActivityTracker()
+        // Never two-way: playback stopping is not a hang-up.
+        _ = tracker.endedCalls(clients: [client("net.whatsapp.WhatsApp", input: false, output: true)], at: t0)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 30).isEmpty)
+        // Zoom may release audio mid-meeting, so it never auto-ends.
+        _ = tracker.endedCalls(clients: [client("us.zoom.xos", input: true, output: true)], at: t0 + 40)
+        XCTAssertTrue(tracker.endedCalls(clients: [], at: t0 + 100).isEmpty)
+    }
+
     func testInputAndOutputMayComeFromDifferentHelperProcesses() {
         var tracker = CallActivityTracker()
         let call = [client("net.whatsapp.WhatsApp", input: true, output: false),
