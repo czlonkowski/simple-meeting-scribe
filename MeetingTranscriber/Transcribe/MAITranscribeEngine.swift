@@ -85,7 +85,11 @@ struct MAITranscribeEngine {
         do {
             // Like Scribe, nothing comes back until the whole file is done —
             // staged messages only.
-            (data, response) = try await Self.session.data(for: request)
+            (data, response) = try await Self.send(
+                request,
+                responseTimeout: Self.responseTimeout(diarize: diarize),
+                onUploaded: { progress(0.1, "Waiting for Azure…") }
+            )
         } catch {
             throw MAIError.network(underlying: error)
         }
@@ -146,15 +150,69 @@ struct MAITranscribeEngine {
     // MARK: – Request
 
     /// The response stays silent until the whole file is processed, so the
-    /// idle timer bounds server-side work: 110 min of audio took under 2 min
-    /// in the benchmark, and a hung diarization should fail over after 10.
-    /// The resource timer leaves room for a slow upload.
+    /// idle timer bounds server-side work for plain requests: 110 min of audio
+    /// took under 2 min in the benchmark. Diarized requests get the tighter
+    /// `responseTimeout`. The resource timer leaves room for a slow upload.
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 600
         config.timeoutIntervalForResource = 1800
         return URLSession(configuration: config)
     }()
+
+    /// How long to wait for the response once the upload is done. Preview
+    /// diarization fails by hanging, and a 110 min meeting came back diarized
+    /// in 106 s including its upload, so a diarized request silent for 3 min
+    /// is given up on (as a timeout, which the pipeline retries without
+    /// diarization) instead of sitting out the 10 min idle timer.
+    static func responseTimeout(diarize: Bool) -> TimeInterval {
+        diarize ? 180 : 600
+    }
+
+    /// Reports the moment the request body has been fully sent.
+    private final class UploadObserver: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        private let uploaded: AsyncStream<Void>.Continuation
+
+        init(uploaded: AsyncStream<Void>.Continuation) {
+            self.uploaded = uploaded
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        didSendBodyData bytesSent: Int64,
+                        totalBytesSent: Int64,
+                        totalBytesExpectedToSend: Int64) {
+            guard totalBytesExpectedToSend > 0, totalBytesSent >= totalBytesExpectedToSend else { return }
+            uploaded.yield()
+            uploaded.finish()
+        }
+    }
+
+    /// Sends the request, failing with `URLError(.timedOut)` when no response
+    /// arrives within `responseTimeout` seconds of the upload finishing.
+    private static func send(_ request: URLRequest,
+                             responseTimeout: TimeInterval,
+                             onUploaded: @escaping () -> Void) async throws -> (Data, URLResponse) {
+        let (uploaded, continuation) = AsyncStream<Void>.makeStream()
+        let observer = UploadObserver(uploaded: continuation)
+        return try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
+            group.addTask {
+                defer { continuation.finish() }
+                return try await session.data(for: request, delegate: observer)
+            }
+            group.addTask {
+                var didUpload = false
+                for await _ in uploaded { didUpload = true }
+                try Task.checkCancellation()
+                if didUpload { onUploaded() }
+                try await Task.sleep(for: .seconds(responseTimeout))
+                Log.pipeline.error("mai: no response \(Int(responseTimeout), privacy: .public)s after upload — giving up on this request")
+                throw URLError(.timedOut)
+            }
+            defer { group.cancelAll() }
+            // The watchdog only ever throws, so the first value is the response.
+            return try await group.next()!
+        }
+    }
 
     private struct Definition: Encodable {
         struct EnhancedMode: Encodable {

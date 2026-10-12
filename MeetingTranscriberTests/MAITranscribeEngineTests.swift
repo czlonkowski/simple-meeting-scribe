@@ -80,6 +80,12 @@ final class MAITranscribeEngineTests: XCTestCase {
         XCTAssertFalse(E.missingAPIKey.allowsScribeFallback)
     }
 
+    func testDiarizedRequestsGiveUpOnASilentServerSooner() {
+        // A hung diarization should fail over in minutes, well inside the idle timer.
+        XCTAssertEqual(MAITranscribeEngine.responseTimeout(diarize: true), 180)
+        XCTAssertEqual(MAITranscribeEngine.responseTimeout(diarize: false), 600)
+    }
+
     func testDiarizedTimeoutsAndDiarizationFailuresRetryWithoutDiarization() {
         typealias E = MAITranscribeEngine.MAIError
         let timeout = E.network(underlying: URLError(.timedOut))
