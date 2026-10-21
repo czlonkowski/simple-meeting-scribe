@@ -9,6 +9,9 @@ private let autoRecordCallsKey = "autoRecordCalls"
 private let callLanguageKey = "callLanguage"
 private let autoStopCallsKey = "autoStopCalls"
 private let promptOnMeetingEndKey = "promptOnMeetingEnd"
+private let defaultEngineKey = "defaultTranscriptionModel"
+private let defaultLanguageKey = "defaultLanguage"
+private let setupCompletedKey = "setupCompleted"
 
 @MainActor
 @Observable
@@ -26,9 +29,43 @@ final class AppState {
     private var deviceListObserver: AnyObject?
 
     // MARK: – Settings
-    /// Not persisted: every launch starts on `WhisperModel.defaultModel`.
-    var selectedModel: WhisperModel = .defaultModel
-    var defaultLanguage: TranscriptionLanguage = .english
+    /// Engine for the next recording. Each launch starts on the saved default
+    /// (setup assistant or Settings); the Record card changes it for the
+    /// session only. With no saved default, a cloud engine is used only when
+    /// its key is set.
+    var selectedModel: WhisperModel = SetupDefaults.initialEngine(
+        stored: UserDefaults.standard.string(forKey: defaultEngineKey).flatMap(WhisperModel.init(rawValue:)),
+        hasMAIKey: AppState.hasMAICredentials(),
+        hasScribeKey: ScribeStore.loadAPIKey() != nil
+    )
+    /// Language for the next recording; each launch starts on the saved default.
+    var defaultLanguage: TranscriptionLanguage =
+        UserDefaults.standard.string(forKey: defaultLanguageKey).flatMap(TranscriptionLanguage.init(rawValue:)) ?? .english
+
+    /// Saves the engine new launches start on, and uses it now.
+    func setDefaultEngine(_ model: WhisperModel) {
+        selectedModel = model
+        UserDefaults.standard.set(model.rawValue, forKey: defaultEngineKey)
+    }
+
+    /// Saves the language new launches start on, and uses it now.
+    func setDefaultLanguage(_ language: TranscriptionLanguage) {
+        defaultLanguage = language
+        UserDefaults.standard.set(language.rawValue, forKey: defaultLanguageKey)
+    }
+
+    static func hasMAICredentials() -> Bool {
+        AzureSpeechStore.loadAPIKey() != nil
+            && MAITranscribeEngine.transcribeURL(endpoint: AzureSpeechStore.loadEndpoint()) != nil
+    }
+
+    /// Shows the setup assistant over the main window.
+    var isSetupPresented = false
+
+    func completeSetup() {
+        UserDefaults.standard.set(true, forKey: setupCompletedKey)
+        isSetupPresented = false
+    }
     var captureSystemAudio: Bool = true
 
     /// Record the meeting's browser window as screen video. Persisted across
@@ -855,6 +892,17 @@ final class AppState {
         didBootstrap = true
         loadTagCatalog()
         await loadTranscripts()
+        let setupCompleted = UserDefaults.standard.bool(forKey: setupCompletedKey)
+        if SetupDefaults.shouldShowSetup(
+            completed: setupCompleted,
+            hasTranscripts: !transcripts.isEmpty,
+            hasCloudKeys: Self.hasMAICredentials() || ScribeStore.loadAPIKey() != nil
+        ) {
+            isSetupPresented = true
+        } else if !setupCompleted {
+            // Set up before the assistant existed: never open it on its own.
+            UserDefaults.standard.set(true, forKey: setupCompletedKey)
+        }
         startMeetingDetection()
     }
 

@@ -109,6 +109,10 @@ struct RootView: View {
         .sheet(item: $pendingImport) { pending in
             ImportFileSheet(url: pending.url)
         }
+        .sheet(isPresented: $state.isSetupPresented) {
+            SetupAssistantView()
+                .interactiveDismissDisabled()
+        }
         .alert(
             "Something went wrong",
             isPresented: Binding(

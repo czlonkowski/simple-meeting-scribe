@@ -30,6 +30,10 @@ struct MeetingTranscriberApp: App {
                     updates.checkForUpdates()
                 }
                 .disabled(!updates.canCheckForUpdates)
+                Button("Setup Assistant…") {
+                    state.isSetupPresented = true
+                }
+                .disabled(state.recordingState.isBusy)
                 Button("Import Audio or Video…") {
                     state.importPanelRequested.toggle()
                 }

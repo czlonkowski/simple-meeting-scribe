@@ -58,8 +58,8 @@ summary model keep audio and text on your Mac and work offline once the
 models are downloaded. It's slower and needs RAM for the summary model.
 
 Mix them as you like: pick the engine and the summary model per meeting.
-New installs start on MAI-Transcribe-2; add your Azure Speech key in
-Settings → General → Transcription, or switch to a local engine there.
+The setup assistant on first launch asks which you want as the default and
+takes your keys; without a cloud key the app starts on local Whisper.
 
 Either way there's no telemetry and no account. Keys stay in your Keychain.
 Besides your chosen services, the app only downloads models from Hugging Face
@@ -72,8 +72,9 @@ off in Settings → General → Updates).
    [GitHub Releases](https://github.com/czlonkowski/simple-meeting-scribe/releases).
    It is signed and notarized by Apple.
 2. Open the DMG and drag **MeetingTranscriber** into **Applications**.
-3. Open it and grant permissions as macOS asks (below). Download the local
-   models you want in Settings; that needs internet once.
+3. Open it. A short setup assistant picks cloud or local transcription, the
+   summary model, your meeting language and call recording, and asks for the
+   permissions below. Rerun it any time from the app menu → Setup Assistant…
 
 Updates are offered inside the app and install only when you click Install,
 never during a recording. Maintainers: see [the release guide](docs/releases.md).

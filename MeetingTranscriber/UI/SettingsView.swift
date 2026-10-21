@@ -25,6 +25,7 @@ struct SettingsView: View {
 
 private struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     /// Shown when the selected cloud model has no key configured.
     private var missingKeyWarning: String? {
@@ -45,12 +46,18 @@ private struct GeneralSettingsView: View {
 
         Form {
             Section {
-                Picker("Model", selection: $state.selectedModel) {
+                Picker("Model", selection: Binding(
+                    get: { appState.selectedModel },
+                    set: { appState.setDefaultEngine($0) }
+                )) {
                     ForEach(WhisperModel.allCases) { m in
                         Text(m.displayName).tag(m)
                     }
                 }
-                Picker("Default language", selection: $state.defaultLanguage) {
+                Picker("Default language", selection: Binding(
+                    get: { appState.defaultLanguage },
+                    set: { appState.setDefaultLanguage($0) }
+                )) {
                     ForEach(TranscriptionLanguage.allCases) { l in
                         Text("\(l.flag) \(l.displayName)").tag(l)
                     }
@@ -71,6 +78,10 @@ private struct GeneralSettingsView: View {
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                         .font(.caption)
+                }
+                Button("Run Setup Assistant…") {
+                    openWindow(id: "main")
+                    appState.isSetupPresented = true
                 }
             } header: {
                 Text("Transcription")
