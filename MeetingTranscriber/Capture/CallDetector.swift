@@ -19,6 +19,8 @@ final class CallDetector {
     var onCallDetected: ((DetectedMeeting) -> Void)?
     /// A call app hung up; the argument is its `DetectedMeeting.platform`.
     var onCallEnded: ((String) -> Void)?
+    /// CoreAudio clients from the latest poll, for other per-second checks.
+    private(set) var latestClients: [AudioClientSnapshot] = []
     /// Last logged mic/speaker use per call app, to log changes only.
     private var loggedActivity: [String: String] = [:]
 
@@ -60,6 +62,7 @@ final class CallDetector {
 
     private func pollOnce() {
         let snapshot = clients()
+        latestClients = snapshot
         for call in tracker.update(clients: snapshot, at: Date()) {
             Log.callDetection.notice("call detected: \(call.app.name, privacy: .public)")
             onCallDetected?(meeting(for: call))

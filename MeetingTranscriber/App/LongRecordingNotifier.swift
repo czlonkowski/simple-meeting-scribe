@@ -32,12 +32,33 @@ struct LongRecordingAlert {
 final class LongRecordingNotifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = LongRecordingNotifier()
 
+    static let meetingEndedCategory = "meeting-ended"
+    static let stopRecordingAction = "stop-recording"
+    private static let meetingEndedID = "meeting-ended"
+    private static let recordingStartKey = "recordingStart"
+
+    /// The user chose "Stop Recording" on a meeting-ended prompt. The argument
+    /// is the start time of the recording the prompt was about.
+    var onStopRequested: ((Date) -> Void)?
+
     /// Called when a recording starts, so the permission prompt appears in
     /// context the first time and the notification is deliverable by the time
     /// the threshold hits.
     func prepare() {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        let stop = UNNotificationAction(identifier: Self.stopRecordingAction,
+                                        title: "Stop Recording",
+                                        options: [])
+        let keep = UNNotificationAction(identifier: "keep-recording",
+                                        title: "Keep Recording",
+                                        options: [])
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: Self.meetingEndedCategory,
+                                   actions: [stop, keep],
+                                   intentIdentifiers: [],
+                                   options: [])
+        ])
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             if !granted {
                 Log.recorder.info("Long-recording notice unavailable: notifications not authorized")
@@ -80,6 +101,45 @@ final class LongRecordingNotifier: NSObject, UNUserNotificationCenterDelegate {
                                             content: content,
                                             trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The meeting looks over; ask whether to stop. `recordingStart` ties the
+    /// answer to this recording so a late click can't stop a newer one.
+    func postMeetingEndedPrompt(meetingName: String, reason: MeetingEndTracker.Reason, recordingStart: Date) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(meetingName) ended?"
+        switch reason {
+        case .appLeft:
+            content.body = "The meeting stopped using the microphone. Stop the recording?"
+        case .silence:
+            content.body = "No one has spoken for 3 minutes. Stop the recording?"
+        }
+        content.sound = .default
+        content.categoryIdentifier = Self.meetingEndedCategory
+        content.userInfo = [Self.recordingStartKey: recordingStart.timeIntervalSince1970]
+        let request = UNNotificationRequest(identifier: Self.meetingEndedID,
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The recording stopped; an unanswered prompt about it is stale.
+    func removeMeetingEndedPrompt() {
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: [Self.meetingEndedID])
+        center.removePendingNotificationRequests(withIdentifiers: [Self.meetingEndedID])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let info = response.notification.request.content.userInfo
+        if response.actionIdentifier == Self.stopRecordingAction,
+           let start = info[Self.recordingStartKey] as? TimeInterval {
+            let date = Date(timeIntervalSince1970: start)
+            DispatchQueue.main.async { [weak self] in self?.onStopRequested?(date) }
+        }
+        completionHandler()
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,

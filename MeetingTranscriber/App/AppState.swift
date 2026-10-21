@@ -8,6 +8,7 @@ private let inputDeviceUIDKey = "preferredInputDeviceUID"
 private let autoRecordCallsKey = "autoRecordCalls"
 private let callLanguageKey = "callLanguage"
 private let autoStopCallsKey = "autoStopCalls"
+private let promptOnMeetingEndKey = "promptOnMeetingEnd"
 
 @MainActor
 @Observable
@@ -55,6 +56,15 @@ final class AppState {
     func setAutoStopCalls(_ value: Bool) {
         autoStopCalls = value
         UserDefaults.standard.set(value, forKey: autoStopCallsKey)
+    }
+
+    /// Ask with a notification whether to stop when a meeting looks over
+    /// (the meeting app left the mic, or 3 minutes of silence).
+    var promptOnMeetingEnd: Bool = UserDefaults.standard.object(forKey: promptOnMeetingEndKey) as? Bool ?? true
+
+    func setPromptOnMeetingEnd(_ value: Bool) {
+        promptOnMeetingEnd = value
+        UserDefaults.standard.set(value, forKey: promptOnMeetingEndKey)
     }
 
     /// Transcription language for auto-recorded calls; switchable mid-recording.
@@ -832,6 +842,11 @@ final class AppState {
     private var recorder: RecordingCoordinator?
     private var elapsedTimer: Timer?
     private var longRecordingAlert = LongRecordingAlert()
+    private var meetingEndTracker = MeetingEndTracker()
+    private var micLevels = LevelAccumulator()
+    private var systemLevels = LevelAccumulator()
+    /// Last logged "a meeting app uses the mic" state, to log changes only.
+    private var loggedMeetingAppMic = false
     private var didBootstrap = false
 
     // MARK: – Bootstrap
@@ -897,6 +912,13 @@ final class AppState {
         }
         calls.start()
         self.callDetector = calls
+
+        LongRecordingNotifier.shared.onStopRequested = { [weak self] recordingStart in
+            guard let self, case .recording(let startedAt, _, _) = self.recordingState,
+                  startedAt == recordingStart else { return }
+            Log.meetingEnd.notice("stopping recording: user confirmed the meeting ended")
+            Task { await self.stopRecording() }
+        }
     }
 
     func dismissDetectedMeeting() {
@@ -948,10 +970,16 @@ final class AppState {
                 meeting: meeting,
                 inputDeviceUID: effectiveInputDeviceUID,
                 onMicLevel: { [weak self] rms in
-                    Task { @MainActor in self?.currentMicRMS = rms }
+                    Task { @MainActor in
+                        self?.currentMicRMS = rms
+                        self?.micLevels.add(rms)
+                    }
                 },
                 onSystemLevel: { [weak self] rms in
-                    Task { @MainActor in self?.currentSystemRMS = rms }
+                    Task { @MainActor in
+                        self?.currentSystemRMS = rms
+                        self?.systemLevels.add(rms)
+                    }
                 },
                 onInputDeviceChange: { [weak self, weak coord] in
                     Task { @MainActor in
@@ -973,6 +1001,10 @@ final class AppState {
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0
             longRecordingAlert = LongRecordingAlert()
+            meetingEndTracker = MeetingEndTracker()
+            _ = micLevels.take()
+            _ = systemLevels.take()
+            loggedMeetingAppMic = false
             LongRecordingNotifier.shared.prepare()
             startElapsedTimer(from: start)
             if let url = meeting?.url { dismissedMeetingURLs.insert(url) }
@@ -1008,6 +1040,7 @@ final class AppState {
         guard case .recording(let startedAt, let meeting, let language) = recordingState else { return }
         recordingState = .stopping
         stopElapsedTimer()
+        LongRecordingNotifier.shared.removeMeetingEndedPrompt()
         currentInputDeviceName = nil
         guard let recorder = recorder else { recordingState = .idle; return }
         defer { self.recorder = nil }
@@ -1053,9 +1086,37 @@ final class AppState {
                     if self.longRecordingAlert.check(elapsedSeconds: self.elapsedSeconds) {
                         LongRecordingNotifier.shared.postLongRecordingNotice(elapsedSeconds: self.elapsedSeconds)
                     }
+                    self.checkMeetingEnd()
                 }
             }
         }
+    }
+
+    /// Once a second while recording: ask whether to stop when the meeting
+    /// looks over. Calls that stop on hang-up by themselves are left alone.
+    private func checkMeetingEnd() {
+        guard case .recording(let startedAt, let meeting, _) = recordingState else { return }
+        let micRMS = isMicMuted ? 0 : micLevels.take()
+        let systemRMS = systemLevels.take()
+        if let meeting, meeting.isCall, autoStopCalls,
+           CallApp.defaults.first(where: { $0.name == meeting.platform })?.hangUpIsDetectable == true {
+            return
+        }
+        let appUsesMic = (callDetector?.latestClients ?? [])
+            .contains { $0.isRunningInput && MeetingEndTracker.isMeetingApp($0) }
+        if appUsesMic != loggedMeetingAppMic {
+            loggedMeetingAppMic = appUsesMic
+            Log.meetingEnd.notice("meeting app mic=\(appUsesMic, privacy: .public)")
+        }
+        guard let reason = meetingEndTracker.tick(meetingAppUsesMic: appUsesMic,
+                                                  systemRMS: systemRMS,
+                                                  micRMS: micRMS),
+              promptOnMeetingEnd else { return }
+        Log.meetingEnd.notice("meeting looks over: \(String(describing: reason), privacy: .public)")
+        let name = meeting.map { $0.isCall ? $0.title : $0.platform } ?? "Meeting"
+        LongRecordingNotifier.shared.postMeetingEndedPrompt(meetingName: name,
+                                                            reason: reason,
+                                                            recordingStart: startedAt)
     }
 
     private func stopElapsedTimer() {

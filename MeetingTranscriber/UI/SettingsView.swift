@@ -111,6 +111,11 @@ private struct GeneralSettingsView: View {
                     set: { state.setAutoStopCalls($0) }
                 ))
                 .help("WhatsApp and iPhone calls. Other call apps are stopped by hand.")
+                Toggle("Ask to stop when a meeting ends", isOn: Binding(
+                    get: { state.promptOnMeetingEnd },
+                    set: { state.setPromptOnMeetingEnd($0) }
+                ))
+                .help("Google Meet, Teams, Zoom and other meetings: a notification with a Stop Recording button")
                 Picker("Call language", selection: Binding(
                     get: { state.callLanguage },
                     set: { state.setCallLanguage($0) }
@@ -123,7 +128,7 @@ private struct GeneralSettingsView: View {
                 Text("Capture")
                     .font(Theme.sectionTitleFont)
             } footer: {
-                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only. Calls are detected when a call app uses the mic and speakers for a few seconds; with automatic recording off, you get a prompt instead. A WhatsApp or iPhone call recording stops by itself a few seconds after the call hangs up; everything else is stopped by hand.")
+                Text("The preferred microphone is used whenever it is connected; otherwise recording follows the system default input. The mic menu on the Record screen overrides this for the current session only. Calls are detected when a call app uses the mic and speakers for a few seconds; with automatic recording off, you get a prompt instead. A WhatsApp or iPhone call recording stops by itself a few seconds after the call hangs up. For other meetings you get a notification with a Stop Recording button when the meeting app leaves the microphone or no one has spoken for 3 minutes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
