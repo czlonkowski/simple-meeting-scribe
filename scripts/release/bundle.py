@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 
@@ -24,7 +25,35 @@ def macho_files(app):
             if p.is_file() and not p.is_symlink() and "Mach-O" in run("file", "-b", p)]
 
 
+FEED_URL = "https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml"
+SPARKLE = "Contents/Frameworks/Sparkle.framework"
+
+
+def prune_sparkle(app):
+    # XPC services are only for sandboxed apps. Removing them is supported and
+    # avoids re-signing Downloader.xpc with its own entitlements.
+    framework = app / SPARKLE
+    for path in [framework / "XPCServices", framework / "Versions/B/XPCServices"]:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.exists():
+            shutil.rmtree(path)
+    # Sparkle ships universal binaries; the release is arm64 only.
+    for binary in macho_files(framework):
+        if run("lipo", "-archs", binary) != "arm64":
+            subprocess.run(["lipo", binary, "-thin", "arm64", "-output", binary], check=True)
+
+
+def set_feed(app, feed_url):
+    """Point a test build at another appcast before it is signed."""
+    path = app / "Contents/Info.plist"
+    info = plistlib.loads(path.read_bytes())
+    info["SUFeedURL"] = feed_url
+    path.write_bytes(plistlib.dumps(info))
+
+
 def prepare(app, packages, lame):
+    prune_sparkle(app)
     helpers = app / "Contents/Helpers"
     helpers.mkdir(parents=True, exist_ok=True)
     shutil.copy2(lame / "lame", helpers / "lame")
@@ -78,9 +107,18 @@ def prepare(app, packages, lame):
     shutil.copy2(ROOT / "scripts/release/Package.resolved", third_party / "Package.resolved")
 
 
-def verify(app, signed=False):
+def verify(app, signed=False, feed_url=FEED_URL):
     require(app.is_dir(), f"Missing app: {app}")
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    require(info.get("SUFeedURL") == feed_url, f"Unexpected Sparkle feed: {info.get('SUFeedURL')}")
+    require(re.fullmatch(r"[A-Za-z0-9+/]{43}=", info.get("SUPublicEDKey", "")) is not None,
+            "SUPublicEDKey is not set to a Sparkle EdDSA public key")
+    require(info.get("SUAutomaticallyUpdate") is False and info.get("SUAllowsAutomaticUpdates") is False,
+            "Updates must not install without a click")
+    framework = app / SPARKLE
+    for relative in ["Versions/B/Sparkle", "Versions/B/Autoupdate", "Versions/B/Updater.app"]:
+        require((framework / relative).exists(), f"Missing Sparkle component: {relative}")
+    require(not list(framework.rglob("*.xpc")), "Sparkle XPC services must be removed")
     require(info["CFBundleIdentifier"] == "com.czlonkowski.MeetingTranscriber", "Unexpected bundle ID")
     require(info["LSMinimumSystemVersion"] == "26.0", "Unexpected minimum macOS version")
     require(info["CFBundlePackageType"] == "APPL", "Not an application bundle")
@@ -141,6 +179,10 @@ def main():
     check = sub.add_parser("verify")
     check.add_argument("app", type=Path)
     check.add_argument("--signed", action="store_true")
+    check.add_argument("--feed-url", default=FEED_URL)
+    feed = sub.add_parser("set-feed")
+    feed.add_argument("app", type=Path)
+    feed.add_argument("feed_url")
     signing = sub.add_parser("sign")
     signing.add_argument("app", type=Path)
     signing.add_argument("identity")
@@ -149,8 +191,10 @@ def main():
         prepare(args.app, args.packages, args.lame)
     elif args.command == "sign":
         sign(args.app, args.identity)
+    elif args.command == "set-feed":
+        set_feed(args.app, args.feed_url)
     else:
-        verify(args.app, args.signed)
+        verify(args.app, args.signed, args.feed_url)
 
 
 if __name__ == "__main__":

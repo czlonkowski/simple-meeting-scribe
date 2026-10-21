@@ -52,6 +52,9 @@ packages:
   swift-sdk:
     url: https://github.com/modelcontextprotocol/swift-sdk
     from: "0.12.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.9.6"
 targets:
   MeetingTranscriber:
     type: application
@@ -81,6 +84,8 @@ targets:
         product: HuggingFace
       - package: swift-sdk
         product: MCP
+      - package: Sparkle
+        product: Sparkle
     info:
       path: MeetingTranscriber/Resources/Info.plist
       properties:
@@ -105,6 +110,15 @@ targets:
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: false
         LSUIElement: false
+        # Sparkle: published GitHub Releases are the update feed (drafts and
+        # prereleases are invisible to /releases/latest). release.sh rewrites
+        # SUFeedURL only for --test-feed builds, which GitHub upload refuses.
+        SUFeedURL: https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml
+        SUPublicEDKey: "9y2vYozT+pPUYZOHGpclBCh/CZIBiNUS6x1m14MwZ0o="
+        SUEnableAutomaticChecks: true
+        SUAutomaticallyUpdate: false
+        # Hides "download and install automatically": installs need a click.
+        SUAllowsAutomaticUpdates: false
   MeetingTranscriberTests:
     type: bundle.unit-test
     platform: macOS

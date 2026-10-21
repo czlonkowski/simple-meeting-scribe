@@ -49,7 +49,29 @@ creates a **draft** release; publication is a separate action in GitHub.
    the credentials before storing them. Both methods use the same `NOTARY_PROFILE`
    setting below; the release scripts do not need the password or key file path.
 
-4. Find the exact signing identity and authenticate GitHub CLI:
+4. Create the Sparkle update key (once per maintainer, not per release). Build the
+   app once so Xcode resolves the Sparkle package, then run:
+
+   ```sh
+   "$(ls -d ~/Library/Developer/Xcode/DerivedData/MeetingTranscriber-*/SourcePackages/artifacts/sparkle/Sparkle/bin | head -1)/generate_keys"
+   ```
+
+   The private key goes into this Mac's login Keychain; the command prints the
+   public key. Put that public key in `SUPublicEDKey` in `project.yml` and
+   commit it (it is public). `release.sh` refuses to build when the Keychain
+   key and `SUPublicEDKey` are not a pair.
+
+   **Back up the private key.** The login Keychain item does not sync to iCloud.
+   Print it with `generate_keys -x sparkle-private-key` (writes a file) and save
+   its contents in the Passwords app, then delete the file. To use it on another
+   Mac: `generate_keys -f sparkle-private-key`. Never commit it.
+
+   If the key is lost, Sparkle still accepts one update that carries a new
+   `SUPublicEDKey`, because the update is a Developer ID signed DMG from the same
+   team. Do not change the Developer ID certificate and the Sparkle key in the
+   same release.
+
+5. Find the exact signing identity and authenticate GitHub CLI:
 
    ```sh
    security find-identity -v -p codesigning
@@ -70,8 +92,10 @@ scripts/release.sh 0.1.0 1
 
 The first argument sets the version; the second is a positive build number.
 Both are embedded in `Info.plist`. Increment the version for each GitHub Release
-and increment the build number for each distribution build. Existing artifact
-directories are never overwritten.
+and increment the build number for each distribution build. Sparkle compares
+build numbers, so a signed build must be higher than the published one;
+`release.sh` checks the published appcast and refuses otherwise. Existing
+artifact directories are never overwritten.
 
 The command:
 
@@ -91,6 +115,9 @@ The command:
    secure timestamp. Rejects development signatures and `get-task-allow`.
 7. Notarizes and staples the app, creates and signs the DMG, then notarizes and
    staples the DMG. Both have tickets so a copied app can pass Gatekeeper offline.
+   Signs the final DMG with the Sparkle EdDSA key and records the signature in
+   `release.json`. Sparkle's XPC services are removed: they are only for
+   sandboxed apps.
 8. Mounts the DMG read-only without opening Finder or the app, verifies its
    contents, and writes the DMG, `SHA256SUMS`, and `release.json` to `dist/`.
 
@@ -140,8 +167,10 @@ The uploader is fixed to `czlonkowski/simple-meeting-scribe`. It checks checksum
 the DMG signature, stapled ticket and Gatekeeper verdict, and that the remote tag
 resolves to the recorded commit. It refuses unsigned/dirty builds, missing tags,
 tag mismatches, and replacement of existing releases. It uploads only the DMG,
-checksum file, and manifest. Source archives are supplied by GitHub from the tag;
-LAME source also travels inside the app itself.
+checksum file, manifest, and `appcast.xml`. The appcast's update notes are the
+release notes file rendered by GitHub, so write them for people reading the
+update window. Source archives are supplied by GitHub from the tag; LAME source
+also travels inside the app itself.
 
 ## Check before publishing the draft
 
@@ -163,14 +192,42 @@ xcrun stapler validate /Applications/MeetingTranscriber.app
 spctl --assess --type execute --verbose=2 /Applications/MeetingTranscriber.app
 ```
 
-Then publish the draft in GitHub's release editor. There is no automatic updater;
-users download a later DMG and replace the app when they are not recording.
+Then publish the draft in GitHub's release editor. **Publishing is the
+rollout:** installed copies read
+`https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml`,
+which only resolves to published, non-prerelease releases. Within a day (or at
+once with **Check for Updates…**) they offer the update; one click downloads,
+verifies, and installs it. The app does not check in the background while it is
+recording or transcribing, and an update the user accepts during a recording
+waits until the recording and its transcription finish. Debug builds never
+update themselves.
+
+Copies older than the first Sparkle release (0.3.0 and earlier) have no updater:
+install that release from the DMG once. Install it by dragging from the DMG, not
+with `scripts/reinstall.sh`, so the app is not root-owned and updates do not ask
+for an administrator password.
+
+### Test an update before publishing
+
+`TEST_FEED_URL=https://… scripts/release.sh VERSION BUILD` builds a signed app
+that reads its appcast from that URL; its files are marked `TESTFEED` and the
+GitHub uploader refuses them. Build two of them (build N installed, build N+1
+as the update), host the N+1 DMG and an appcast at https URLs, and write that
+appcast with:
+
+```sh
+python3 scripts/release/appcast.py write dist/<N+1 dir> notes.html appcast.xml \
+  --test-enclosure-url https://…/Simple-Meeting-Scribe-VERSION-arm64-TESTFEED.dmg
+```
+
+Check the install, the relaunch, that privacy permissions survive, and that an
+update accepted during a recording waits for it to finish.
 
 ## Focused checks that do not launch the app
 
 ```sh
 scripts/test-audio-export.sh /path/to/built/lame
-python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
+python3 -m unittest discover -s scripts/release -p 'test_*.py' -v  # manifest + appcast
 bash -n scripts/release.sh scripts/github-release.sh scripts/build-lame.sh scripts/test-audio-export.sh
 ```
 

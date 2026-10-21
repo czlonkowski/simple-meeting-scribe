@@ -10,6 +10,9 @@ Signed release (default):
   NOTARY_PROFILE='meeting-transcriber-notary'
 
 --unsigned builds a local packaging test only; GitHub upload rejects it.
+TEST_FEED_URL=https://… builds a signed app that reads its Sparkle appcast
+from that URL instead of the published feed (for update tests). GitHub
+upload rejects it.
 Optional: BUILD_JOBS (default 2), LAME_SOURCE_ARCHIVE (verified local source),
           RELEASE_PACKAGES_DIR (isolated Swift package cache to reuse).
 See docs/releases.md for certificate setup and GitHub draft upload.
@@ -47,8 +50,18 @@ if [[ $UNSIGNED == false ]]; then
     }
     xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json >/dev/null
 fi
+TEST_FEED_URL="${TEST_FEED_URL:-}"
+FEED_URL=https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml
+if [[ -n $TEST_FEED_URL ]]; then
+    [[ $TEST_FEED_URL == https://* ]] || { echo "TEST_FEED_URL must be https (App Transport Security)." >&2; exit 2; }
+    FEED_URL="$TEST_FEED_URL"
+elif [[ $UNSIGNED == false ]]; then
+    # Sparkle offers only a higher CFBundleVersion than the installed one.
+    python3 scripts/release/appcast.py check-newer "$BUILD_NUMBER"
+fi
 NAME="Simple-Meeting-Scribe-$VERSION-arm64"
 [[ $UNSIGNED == false ]] || NAME="$NAME-UNSIGNED"
+[[ -z $TEST_FEED_URL ]] || NAME="$NAME-TESTFEED"
 OUTPUT="$REPO_ROOT/dist/$NAME-build$BUILD_NUMBER"
 [[ ! -e $OUTPUT ]] || { echo "Output already exists: $OUTPUT" >&2; exit 1; }
 mkdir -p "$REPO_ROOT/build" "$REPO_ROOT/dist"
@@ -89,7 +102,17 @@ scripts/build-lame.sh "$WORK/lame"
 APP="$WORK/image/MeetingTranscriber.app"
 ditto "$WORK/DerivedData/Build/Products/Release/MeetingTranscriber.app" "$APP"
 python3 scripts/release/bundle.py prepare "$APP" "$PACKAGES" "$WORK/lame"
-python3 scripts/release/bundle.py verify "$APP"
+[[ -z $TEST_FEED_URL ]] || python3 scripts/release/bundle.py set-feed "$APP" "$TEST_FEED_URL"
+python3 scripts/release/bundle.py verify "$APP" --feed-url "$FEED_URL"
+SPARKLE_BIN="$PACKAGES/artifacts/sparkle/Sparkle/bin"
+if [[ $UNSIGNED == false ]]; then
+    # The app trusts only SUPublicEDKey; the Keychain key must be its pair.
+    APP_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist")"
+    KEYCHAIN_KEY="$("$SPARKLE_BIN/generate_keys" -p)"
+    [[ $APP_KEY == "$KEYCHAIN_KEY" ]] || {
+        echo "SUPublicEDKey does not match the Sparkle key in this Mac's Keychain." >&2; exit 1;
+    }
+fi
 scripts/test-audio-export.sh "$APP/Contents/Helpers/lame" > "$WORK/audio-export-tests.log" 2>&1 || {
     cat "$WORK/audio-export-tests.log" >&2; exit 1;
 }
@@ -106,7 +129,7 @@ notarize() {
 }
 if [[ $UNSIGNED == false ]]; then
     python3 scripts/release/bundle.py sign "$APP" "$SIGNING_IDENTITY"
-    python3 scripts/release/bundle.py verify "$APP" --signed
+    python3 scripts/release/bundle.py verify "$APP" --signed --feed-url "$FEED_URL"
     ditto -c -k --keepParent "$APP" "$WORK/notarization.zip"
     notarize "$WORK/notarization.zip" app "$APP"
     spctl --assess --type execute --verbose=2 "$APP"
@@ -137,13 +160,19 @@ if [[ $UNSIGNED == false ]]; then
     spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
 fi
 hdiutil verify "$DMG"
+ED_SIGNATURE=""
+if [[ $UNSIGNED == false ]]; then
+    # Sign the final, stapled DMG: Sparkle checks these exact bytes.
+    ED_SIGNATURE="$("$SPARKLE_BIN/sign_update" -p "$DMG")"
+    "$SPARKLE_BIN/sign_update" --verify "$DMG" "$ED_SIGNATURE"
+fi
 MOUNT="$WORK/mounted"
 mkdir "$MOUNT"
 hdiutil attach "$DMG" -readonly -nobrowse -noautoopen -mountpoint "$MOUNT" >/dev/null
 if [[ $UNSIGNED == true ]]; then
-    python3 scripts/release/bundle.py verify "$MOUNT/MeetingTranscriber.app"
+    python3 scripts/release/bundle.py verify "$MOUNT/MeetingTranscriber.app" --feed-url "$FEED_URL"
 else
-    python3 scripts/release/bundle.py verify "$MOUNT/MeetingTranscriber.app" --signed
+    python3 scripts/release/bundle.py verify "$MOUNT/MeetingTranscriber.app" --signed --feed-url "$FEED_URL"
 fi
 if [[ $UNSIGNED == false ]]; then
     xcrun stapler validate "$MOUNT/MeetingTranscriber.app"
@@ -151,15 +180,19 @@ if [[ $UNSIGNED == false ]]; then
 fi
 hdiutil detach "$MOUNT" >/dev/null
 MOUNT=""
-python3 - "$WORK/artifacts" "$VERSION" "$BUILD_NUMBER" "$COMMIT" "$DIRTY" "$UNSIGNED" "$DMG" <<'PY'
+python3 - "$WORK/artifacts" "$VERSION" "$BUILD_NUMBER" "$COMMIT" "$DIRTY" "$UNSIGNED" "$DMG" "$ED_SIGNATURE" "$TEST_FEED_URL" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
-output, version, build, commit, dirty, unsigned, dmg = sys.argv[1:]
+output, version, build, commit, dirty, unsigned, dmg, signature, test_feed = sys.argv[1:]
 path = pathlib.Path(dmg)
 digest = hashlib.sha256(path.read_bytes()).hexdigest()
-manifest = dict(schemaVersion=1, version=version, buildNumber=build, commit=commit,
+manifest = dict(schemaVersion=2, version=version, buildNumber=build, commit=commit,
                 sourceDirty=dirty == "true", signed=unsigned == "false", notarized=unsigned == "false",
                 architecture="arm64", minimumMacOS="26.0", dmg=path.name, sha256=digest,
                 xcode=subprocess.check_output(["xcodebuild", "-version"], text=True).strip())
+if signature:
+    manifest["sparkle"] = dict(edSignature=signature, length=path.stat().st_size)
+if test_feed:
+    manifest["testFeed"] = test_feed
 pathlib.Path(output, "release.json").write_text(json.dumps(manifest, indent=2) + "\n")
 pathlib.Path(output, "SHA256SUMS").write_text(f"{digest}  {path.name}\n")
 PY

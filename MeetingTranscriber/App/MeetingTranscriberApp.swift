@@ -3,7 +3,14 @@ import SwiftUI
 @main
 struct MeetingTranscriberApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var state = AppState()
+    @State private var state: AppState
+    @State private var updates: UpdateController
+
+    init() {
+        let state = AppState()
+        _state = State(initialValue: state)
+        _updates = State(initialValue: UpdateController(appState: state))
+    }
 
     var body: some Scene {
         WindowGroup("Meeting Transcriber", id: "main") {
@@ -19,6 +26,10 @@ struct MeetingTranscriberApp: App {
         .commands {
             CommandGroup(replacing: .newItem) { }
             CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updates.checkForUpdates()
+                }
+                .disabled(!updates.canCheckForUpdates)
                 Button("Import Audio or Video…") {
                     state.importPanelRequested.toggle()
                 }
@@ -36,10 +47,11 @@ struct MeetingTranscriberApp: App {
         Settings {
             SettingsView()
                 .environment(state)
+                .environment(updates)
         }
 
         MenuBarExtra {
-            MenuBarMenu(state: state)
+            MenuBarMenu(state: state, updates: updates)
         } label: {
             MenuBarLabel(state: state)
         }

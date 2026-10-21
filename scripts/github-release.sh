@@ -28,7 +28,14 @@ if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
     echo "A release already exists for $TAG; refusing to replace assets." >&2
     exit 1
 fi
+# Sparkle shows these notes in its update window. The appcast goes live at
+# /releases/latest/download/appcast.xml only when the draft is published.
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+gh api markdown -f mode=gfm -f context="$REPOSITORY" -F text=@"$NOTES" > "$WORK/notes.html"
+python3 "$REPO_ROOT/scripts/release/appcast.py" write "$ARTIFACTS" "$WORK/notes.html" "$WORK/appcast.xml"
 gh release create "$TAG" --repo "$REPOSITORY" --verify-tag --draft \
     --title "Simple Meeting Scribe $VERSION" --notes-file "$NOTES" \
-    "$DMG" "$ARTIFACTS/SHA256SUMS" "$ARTIFACTS/release.json"
+    "$DMG" "$ARTIFACTS/SHA256SUMS" "$ARTIFACTS/release.json" "$WORK/appcast.xml"
 echo "Draft created. Test the downloaded DMG on a clean Mac before publishing it on GitHub."
+echo "Publishing the draft offers the update to every installed copy through Sparkle."

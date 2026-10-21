@@ -15,9 +15,11 @@ class ArtifactTests(unittest.TestCase):
         self.name = "Simple-Meeting-Scribe-0.1.0-arm64.dmg"
         (self.directory / self.name).write_bytes(b"synthetic DMG for checksum validation")
         self.digest = hashlib.sha256((self.directory / self.name).read_bytes()).hexdigest()
-        self.manifest = dict(schemaVersion=1, version="0.1.0", buildNumber="1",
+        self.manifest = dict(schemaVersion=2, version="0.1.0", buildNumber="1",
                              commit="a" * 40, sourceDirty=False, signed=True, notarized=True,
-                             architecture="arm64", minimumMacOS="26.0", dmg=self.name, sha256=self.digest)
+                             architecture="arm64", minimumMacOS="26.0", dmg=self.name, sha256=self.digest,
+                             sparkle=dict(edSignature="A" * 86 + "==",
+                                          length=(self.directory / self.name).stat().st_size))
         self.save()
         (self.directory / "SHA256SUMS").write_text(f"{self.digest}  {self.name}\n")
 
@@ -36,6 +38,24 @@ class ArtifactTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate(self.directory)
                 self.manifest[field] = previous
+
+    def test_rejects_test_feed_builds(self):
+        self.manifest["testFeed"] = "https://example.com/appcast.xml"
+        self.save()
+        with self.assertRaisesRegex(ValueError, "Test-feed"):
+            validate(self.directory)
+
+    def test_rejects_missing_or_mismatched_sparkle_signature(self):
+        for sparkle in [None, dict(edSignature="short", length=self.manifest["sparkle"]["length"]),
+                        dict(edSignature="A" * 86 + "==", length=1)]:
+            with self.subTest(sparkle=sparkle):
+                previous = self.manifest["sparkle"]
+                self.manifest["sparkle"] = sparkle
+                self.save()
+                with self.assertRaisesRegex(ValueError, "Sparkle"):
+                    validate(self.directory)
+                self.manifest["sparkle"] = previous
+                self.save()
 
     def test_rejects_modified_dmg(self):
         (self.directory / self.name).write_bytes(b"changed after verification")

@@ -138,8 +138,45 @@ private struct GeneralSettingsView: View {
                 Text("Storage")
                     .font(Theme.sectionTitleFont)
             }
+            UpdateSettingsSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct UpdateSettingsSection: View {
+    @Environment(UpdateController.self) private var updates
+
+    private var currentVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
+    var body: some View {
+        @Bindable var updates = updates
+
+        Section {
+            LabeledContent("Version", value: currentVersion)
+            Toggle("Check for updates automatically", isOn: $updates.automaticallyChecksForUpdates)
+            if let version = updates.pendingInstallVersion {
+                Label("Version \(version) installs when the recording and transcription finish.", systemImage: "clock")
+                    .foregroundStyle(.secondary)
+            }
+            Button("Check Now") { updates.checkForUpdates() }
+                .disabled(!updates.canCheckForUpdates)
+        } header: {
+            Text("Updates")
+                .font(Theme.sectionTitleFont)
+        } footer: {
+            Text(UpdateController.isEnabled
+                 ? "Updates come from published GitHub Releases. Nothing installs during a recording or while transcripts are being made."
+                 : "Updates are off in development builds.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .disabled(!UpdateController.isEnabled)
     }
 }
 

@@ -907,8 +907,24 @@ final class AppState {
     }
 
     // MARK: – Recording lifecycle
+    /// Set while Sparkle quits the app to install an update, so a call that
+    /// starts in that window is not auto-recorded and then cut.
+    private(set) var isTerminatingForUpdate = false
+    private var terminatingForUpdateReset: Task<Void, Never>?
+
+    func beginTerminatingForUpdate() {
+        isTerminatingForUpdate = true
+        terminatingForUpdateReset?.cancel()
+        // If the installer fails the app keeps running; recording must work again.
+        terminatingForUpdateReset = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else { return }
+            self?.isTerminatingForUpdate = false
+        }
+    }
+
     func startRecording(language: TranscriptionLanguage, meeting: DetectedMeeting?) async {
-        guard case .idle = recordingState else { return }
+        guard case .idle = recordingState, !isTerminatingForUpdate else { return }
         // A recording started by hand in the middle of a call is still a call
         // recording: without the call, an iPhone call's remote side (played by
         // avconferenced) is recorded as silence.

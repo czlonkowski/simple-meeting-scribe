@@ -7,13 +7,15 @@ import re
 import sys
 
 
-def validate(directory):
+def validate(directory, allow_test_feed=False):
     directory = Path(directory)
     manifest = json.loads((directory / "release.json").read_text())
-    if manifest.get("schemaVersion") != 1:
+    if manifest.get("schemaVersion") != 2:
         raise ValueError("Unsupported release manifest")
     if manifest.get("signed") is not True or manifest.get("notarized") is not True:
         raise ValueError("Only signed and notarized releases can be uploaded")
+    if manifest.get("testFeed") is not None and not allow_test_feed:
+        raise ValueError("Test-feed builds cannot be uploaded")
     if manifest.get("sourceDirty") is not False:
         raise ValueError("Release must come from a clean commit")
     version = manifest.get("version", "")
@@ -26,7 +28,7 @@ def validate(directory):
         raise ValueError("Invalid build number")
     if manifest.get("architecture") != "arm64" or manifest.get("minimumMacOS") != "26.0":
         raise ValueError("Unexpected platform")
-    expected_name = f"Simple-Meeting-Scribe-{version}-arm64.dmg"
+    expected_name = f"Simple-Meeting-Scribe-{version}-arm64{'-TESTFEED' if manifest.get('testFeed') else ''}.dmg"
     if manifest.get("dmg") != expected_name:
         raise ValueError("Unexpected DMG filename")
     hasher = hashlib.sha256()
@@ -38,6 +40,11 @@ def validate(directory):
         raise ValueError("DMG checksum does not match the release manifest")
     if (directory / "SHA256SUMS").read_text() != f"{digest}  {expected_name}\n":
         raise ValueError("SHA256SUMS does not match the DMG")
+    sparkle = manifest.get("sparkle") or {}
+    if not re.fullmatch(r"[A-Za-z0-9+/]{86}==", sparkle.get("edSignature", "")):
+        raise ValueError("Missing Sparkle EdDSA signature")
+    if sparkle.get("length") != (directory / expected_name).stat().st_size:
+        raise ValueError("Sparkle length does not match the DMG")
     return manifest
 
 

@@ -3,6 +3,7 @@ import SwiftUI
 /// Dropdown contents of the menu-bar extra.
 struct MenuBarMenu: View {
     let state: AppState
+    let updates: UpdateController
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -49,6 +50,17 @@ struct MenuBarMenu: View {
         Button("Show Window") {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "main")
+        }
+
+        if let version = updates.pendingInstallVersion {
+            Text("Update \(version) installs when idle")
+                .foregroundStyle(.secondary)
+        } else {
+            Button("Check for Updates…") {
+                NSApp.activate(ignoringOtherApps: true)
+                updates.checkForUpdates()
+            }
+            .disabled(!updates.canCheckForUpdates)
         }
 
         Divider()

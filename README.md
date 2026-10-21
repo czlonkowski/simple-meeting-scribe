@@ -31,8 +31,11 @@ licensed; fork it, strip it, reshape it — it's yours.
 ## What it does not do
 
 - No telemetry or required app account. Local models download from Hugging Face;
-  optional Azure transcription/summarization uses your own credentials.
-- No auto-update. No App Store listing.
+  optional Azure transcription/summarization uses your own credentials. The
+  update check downloads a small file from this repository's GitHub Releases
+  once a day (turn it off in Settings › General › Updates).
+- No silent updates: a new version installs only when you click Install, and
+  never during a recording. No App Store listing.
 - No CI or backwards-compatibility promise.
 - Not localised beyond English + Polish (the two languages I need).
 

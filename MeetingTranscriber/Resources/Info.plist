@@ -48,5 +48,15 @@
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>9y2vYozT+pPUYZOHGpclBCh/CZIBiNUS6x1m14MwZ0o=</string>
 </dict>
 </plist>
