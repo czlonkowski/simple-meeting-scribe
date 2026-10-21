@@ -2,8 +2,8 @@
 
 A personal meeting transcriber for macOS. I built it for myself. I'm putting
 the source out there because other people asked — **not** because I'm trying
-to ship a product. Transcription and summaries run locally or in the cloud;
-you choose per meeting.
+to ship a product. Use the cloud when you want speed and quality, or keep
+everything on your Mac when privacy matters most — you choose per meeting.
 
 There is no support commitment or roadmap. If something breaks, you fix it.
 If you want a feature, you add it. The project is MIT licensed; fork it, strip
@@ -44,25 +44,27 @@ it, reshape it — it's yours.
 - A local [MCP server](docs/MCP.md) lets Claude Code or another MCP client on
   the same Mac search, read and tag your transcripts.
 
-## What leaves your Mac
+## Cloud or local
 
-- **Audio** goes to Azure Speech or ElevenLabs only when a cloud engine
-  transcribes the meeting. If an MAI request fails and an ElevenLabs key is
-  set, the app retries with ElevenLabs on its own; the transcript records
-  which engine was used.
-- **Transcript text** goes to Azure OpenAI only when you summarize with an
-  Azure deployment.
-- **Model downloads** come from Hugging Face.
-- **Update check:** once a day the app downloads a small file from this
-  repository's GitHub Releases. Turn it off in Settings → General → Updates.
+**Cloud — for speed and quality.** MAI-Transcribe-2 and ElevenLabs Scribe
+transcribe an hour-long meeting in under a minute and gave the best accuracy
+and speaker separation in my tests, Polish included. Azure OpenAI writes
+summaries without loading a model on your Mac. You bring your own keys, so
+the audio and text go to your own Azure or ElevenLabs account. If MAI fails
+and an ElevenLabs key is set, the app retries with Scribe on its own.
 
-No telemetry, no account. Keys stay in your Keychain. To keep everything on
-the Mac, pick Whisper or Parakeet and a local summary model, and add no cloud
-keys.
+**Local — when privacy matters most.** Whisper or Parakeet plus an MLX
+summary model keep audio and text on your Mac and work offline once the
+models are downloaded. It's slower and needs RAM for the summary model.
 
-New installs start on MAI-Transcribe-2. Without an Azure Speech key a
-recording can't be transcribed until you add one in Settings → General →
-Transcription or pick a local engine there.
+Mix them as you like: pick the engine and the summary model per meeting.
+New installs start on MAI-Transcribe-2; add your Azure Speech key in
+Settings → General → Transcription, or switch to a local engine there.
+
+Either way there's no telemetry and no account. Keys stay in your Keychain.
+Besides your chosen services, the app only downloads models from Hugging Face
+and checks this repository's GitHub Releases for updates once a day (turn it
+off in Settings → General → Updates).
 
 ## Install
 
