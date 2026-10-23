@@ -103,6 +103,9 @@ struct TranscriptSegment: Codable, Identifiable, Hashable, Sendable {
     let end: Double     // seconds
     var speakerId: Int  // 0-based; -1 for unknown
     let text: String
+    /// The diarizer's speaker, kept when `SpeakerCorrection` moved this
+    /// segment to another speaker. Nil when the segment was never moved.
+    var diarizedSpeakerId: Int? = nil
 }
 
 struct SpeakerLabel: Codable, Hashable, Identifiable, Sendable {
@@ -206,6 +209,9 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     // Per-meeting override for the summarization model. nil = use the
     // language default from Settings.
     var summaryModelOverride: SummaryModel?
+    /// When `SpeakerCorrection` ran on this transcript. It runs once, so a
+    /// regenerated summary never re-corrects already corrected speakers.
+    var speakersCorrectedAt: Date? = nil
 
     /// Date to display and sort by: the real recording date when known,
     /// otherwise the transcription date.
@@ -247,5 +253,6 @@ extension TranscriptDocument {
         // Lenient: present-but-unknown rawValue throws inside decodeIfPresent,
         // which `try?` turns into nil; absent key also yields nil.
         summaryModelOverride = (try? c.decodeIfPresent(SummaryModel.self, forKey: .summaryModelOverride)) ?? nil
+        speakersCorrectedAt = try c.decodeIfPresent(Date.self, forKey: .speakersCorrectedAt)
     }
 }

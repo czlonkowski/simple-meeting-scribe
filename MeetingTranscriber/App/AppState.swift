@@ -581,8 +581,40 @@ final class AppState {
                 await MainActor.run {
                     self?.summarizationStage = .identifyingSpeakers
                 }
+
+                // 0) Move lines the diarizer filed under the wrong speaker.
+                //    Azure only, and once per transcript: a regenerated
+                //    summary must not re-correct corrected speakers.
+                var workingDoc = doc
+                var currentFeed = initialFeed
+                if inferSpeakerNames,
+                   case .azure(let client) = backend,
+                   doc.speakersCorrectedAt == nil,
+                   SpeakerCorrection.isApplicable(to: doc) {
+                    let outcome = try await SpeakerCorrection.run(doc: doc, client: client)
+                    if outcome.succeededWindows > 0 {
+                        let saved: TranscriptDocument? = await MainActor.run {
+                            guard let self,
+                                  let idx = self.transcripts.firstIndex(where: { $0.id == transcriptID })
+                            else { return nil }
+                            var updated = self.transcripts[idx]
+                            // Only when the segments are still the ones that were corrected.
+                            guard updated.segments.map(\.id) == outcome.segments.map(\.id) else { return nil }
+                            updated.segments = outcome.segments
+                            updated.speakersCorrectedAt = Date()
+                            self.transcripts[idx] = updated
+                            try? TranscriptStore.shared.save(updated, audioSource: nil)
+                            return updated
+                        }
+                        if let saved {
+                            workingDoc = saved
+                            currentFeed = TranscriptFormatter.renderPlainForLLM(saved)
+                        }
+                    }
+                }
+
                 let defaultRemoteRegex = try! Regex<Substring>("^Remote(?: \\d+)?$")
-                var workingSpeakers = doc.speakers
+                var workingSpeakers = workingDoc.speakers
 
                 // 1) Deterministic: rename "You" → configured user display name.
                 if !configuredUserName.isEmpty {
@@ -602,7 +634,7 @@ final class AppState {
                     let identifyPrompt = SummaryPrompts.identifyInstruction(
                         for: language,
                         labels: remoteToInfer.map(\.name)
-                    ) + "\n\nTranscript:\n" + initialFeed
+                    ) + "\n\nTranscript:\n" + currentFeed
                     let identifyStream = try await streamPass(.identifySpeakers, prompt: identifyPrompt)
                     var identifyRaw = ""
                     for try await chunk in identifyStream {
@@ -629,7 +661,7 @@ final class AppState {
                 let feed: String = await MainActor.run {
                     guard let self,
                           let idx = self.transcripts.firstIndex(where: { $0.id == transcriptID })
-                    else { return initialFeed }
+                    else { return currentFeed }
                     if self.transcripts[idx].speakers != workingSpeakers {
                         var updated = self.transcripts[idx]
                         updated.speakers = workingSpeakers
@@ -637,7 +669,7 @@ final class AppState {
                         try? TranscriptStore.shared.save(updated, audioSource: nil)
                         return TranscriptFormatter.renderPlainForLLM(updated)
                     }
-                    return initialFeed
+                    return currentFeed
                 }
 
                 // --- Summary pass ---

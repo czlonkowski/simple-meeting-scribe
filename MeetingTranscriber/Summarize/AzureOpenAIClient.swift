@@ -76,15 +76,18 @@ struct AzureOpenAIClient: Sendable {
 
     /// Stream the reply to a single-turn prompt with the given system
     /// instructions. Cancelling the consuming loop cancels the request.
+    /// `reasoningEffort` overrides the deployment's setting for this request.
     func stream(
         prompt: String,
         instructions: String,
-        maxCompletionTokens: Int
+        maxCompletionTokens: Int,
+        reasoningEffort: AzureDeployment.ReasoningEffort? = nil
     ) -> AsyncThrowingStream<String, Error> {
         let request: URLRequest
         do {
             request = try makeRequest(prompt: prompt, instructions: instructions,
-                                      maxCompletionTokens: maxCompletionTokens)
+                                      maxCompletionTokens: maxCompletionTokens,
+                                      reasoningEffort: reasoningEffort ?? deployment.reasoningEffort)
         } catch {
             return AsyncThrowingStream { $0.finish(throwing: error) }
         }
@@ -133,13 +136,14 @@ struct AzureOpenAIClient: Sendable {
     static func requestBody(deployment: AzureDeployment,
                             prompt: String,
                             instructions: String,
-                            maxCompletionTokens: Int) throws -> Data {
+                            maxCompletionTokens: Int,
+                            reasoningEffort: AzureDeployment.ReasoningEffort? = nil) throws -> Data {
         let body = ChatRequest(
             model: deployment.deployment,
             messages: [.init(role: "system", content: instructions),
                        .init(role: "user", content: prompt)],
             maxCompletionTokens: maxCompletionTokens,
-            reasoningEffort: deployment.reasoningEffort.apiValue
+            reasoningEffort: (reasoningEffort ?? deployment.reasoningEffort).apiValue
         )
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -148,7 +152,8 @@ struct AzureOpenAIClient: Sendable {
 
     private func makeRequest(prompt: String,
                              instructions: String,
-                             maxCompletionTokens: Int) throws -> URLRequest {
+                             maxCompletionTokens: Int,
+                             reasoningEffort: AzureDeployment.ReasoningEffort) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -156,7 +161,8 @@ struct AzureOpenAIClient: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "api-key")
         request.httpBody = try Self.requestBody(deployment: deployment, prompt: prompt,
                                                 instructions: instructions,
-                                                maxCompletionTokens: maxCompletionTokens)
+                                                maxCompletionTokens: maxCompletionTokens,
+                                                reasoningEffort: reasoningEffort)
         return request
     }
 
