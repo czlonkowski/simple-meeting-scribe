@@ -24,6 +24,16 @@ struct LongRecordingAlert {
     }
 }
 
+/// Hard cap on one recording. A recording still running at 3 hours is
+/// stopped and transcribed, so a forgotten one can't run all night.
+enum RecordingLimit {
+    static let maxSeconds = 10_800
+
+    static func isReached(elapsedSeconds: Int) -> Bool {
+        elapsedSeconds >= maxSeconds
+    }
+}
+
 /// Posts the user notification behind `LongRecordingAlert`.
 ///
 /// The delegate exists because banners are suppressed by default while the
@@ -70,8 +80,21 @@ final class LongRecordingNotifier: NSObject, UNUserNotificationCenterDelegate {
         let hours = elapsedSeconds / 3_600
         let content = UNMutableNotificationContent()
         content.title = "Still recording"
-        content.body = "This recording has been running for \(hours) hours. Stop it if the meeting is over."
+        content.body = "This recording has been running for \(hours) hours. It stops by itself at \(RecordingLimit.maxSeconds / 3_600) hours."
         content.sound = .default
+        let request = UNNotificationRequest(identifier: "long-recording",
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// The recording hit `RecordingLimit` and was stopped without the user.
+    func postRecordingLimitNotice() {
+        let content = UNMutableNotificationContent()
+        content.title = "Recording stopped"
+        content.body = "Recordings stop automatically after \(RecordingLimit.maxSeconds / 3_600) hours. Transcribing…"
+        content.sound = .default
+        // Same identifier: replaces the "Still recording" banner.
         let request = UNNotificationRequest(identifier: "long-recording",
                                             content: content,
                                             trigger: nil)

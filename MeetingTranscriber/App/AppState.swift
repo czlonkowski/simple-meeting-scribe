@@ -1163,6 +1163,12 @@ final class AppState {
                 guard let self else { return }
                 if self.recordingState.isRecording {
                     self.elapsedSeconds = Int(Date().timeIntervalSince(start))
+                    if RecordingLimit.isReached(elapsedSeconds: self.elapsedSeconds) {
+                        Log.recorder.notice("stopping recording: reached the \(RecordingLimit.maxSeconds, privacy: .public)s limit")
+                        LongRecordingNotifier.shared.postRecordingLimitNotice()
+                        Task { await self.stopRecording() }
+                        return
+                    }
                     if self.longRecordingAlert.check(elapsedSeconds: self.elapsedSeconds) {
                         LongRecordingNotifier.shared.postLongRecordingNotice(elapsedSeconds: self.elapsedSeconds)
                     }

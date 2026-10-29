@@ -37,3 +37,11 @@ final class LongRecordingAlertTests: XCTestCase {
         XCTAssertTrue(alert.check(elapsedSeconds: 60))
     }
 }
+
+final class RecordingLimitTests: XCTestCase {
+    func testStopsAtThreeHours() {
+        XCTAssertFalse(RecordingLimit.isReached(elapsedSeconds: 10_799))
+        XCTAssertTrue(RecordingLimit.isReached(elapsedSeconds: 10_800))
+        XCTAssertTrue(RecordingLimit.isReached(elapsedSeconds: 12_000))
+    }
+}
