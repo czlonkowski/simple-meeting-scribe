@@ -39,7 +39,8 @@ packages:
     from: "0.9.0"
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio
-    from: "0.12.0"
+    # Exact: minor releases change the ASR API.
+    exactVersion: "0.17.7"
   mlx-swift-lm:
     url: https://github.com/ml-explore/mlx-swift-lm
     from: "3.31.4"

@@ -49,7 +49,8 @@ actor LiveTranscriber {
         var started: [(SlidingWindowAsrManager, LiveSpeaker, AsyncStream<SlidingWindowTranscriptionUpdate>)] = []
         for (source, speaker) in sources {
             let manager = SlidingWindowAsrManager(config: .streaming)
-            try await manager.start(models: models, source: source)
+            try await manager.loadModels(models)
+            try await manager.startStreaming(source: source)
             let updates = await manager.transcriptionUpdates
             started.append((manager, speaker, updates))
         }

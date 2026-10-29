@@ -19,7 +19,9 @@ actor ParakeetEngine {
         let manager = try await loadedManager()
         progress(0.25, "Transcribing (Parakeet)…")
 
-        let result = try await manager.transcribe(url, source: .system)
+        // A fresh decoder state per file: nothing carries over between files.
+        var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
+        let result = try await manager.transcribe(url, decoderState: &decoderState)
         Log.parakeet.notice("transcribed \(url.lastPathComponent, privacy: .public) in \(result.processingTime, privacy: .public)s, \(result.tokenTimings?.count ?? 0, privacy: .public) tokens")
 
         progress(0.85, "Aligning segments…")

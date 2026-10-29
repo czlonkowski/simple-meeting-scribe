@@ -62,6 +62,7 @@
 		693688CDE3E25206223914D9 /* ParakeetSegmenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C85BA58CD0622B58C7A7B2 /* ParakeetSegmenterTests.swift */; };
 		6972F2A1AAC8533313E860F7 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948BAEDD8814976B60C1D2F4 /* UpdateController.swift */; };
 		72D33399D64CF1E46D037259 /* MeetingEndTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D428A1BB47E19F0C45EB3C25 /* MeetingEndTracker.swift */; };
+		75EDFEA44D8A248326FB54A5 /* FluidAudioLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C91D3980F74A12D8DE11D0B /* FluidAudioLiveTests.swift */; };
 		7638A4BDEE638058887A3F4A /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64005F4AC02855F2487ED608 /* ScreenRecorder.swift */; };
 		76768FF6CFDBFF736A6DC54A /* MLXHuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 1AD471B4C39D22F7B5C4F309 /* MLXHuggingFace */; };
 		779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC129E33DD25FDF3CA452C9 /* AzureDeploymentEditor.swift */; };
@@ -170,6 +171,7 @@
 		64005F4AC02855F2487ED608 /* ScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecorder.swift; sourceTree = "<group>"; };
 		6602515950B34F876B321764 /* TranscriptionPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPipeline.swift; sourceTree = "<group>"; };
 		68439AE33D5159F8474261AF /* MicHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicHealthTests.swift; sourceTree = "<group>"; };
+		6C91D3980F74A12D8DE11D0B /* FluidAudioLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FluidAudioLiveTests.swift; sourceTree = "<group>"; };
 		747B97F80070E768617576E9 /* MCPTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTools.swift; sourceTree = "<group>"; };
 		7553778A8A8B77A6E443E32C /* TagStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagStore.swift; sourceTree = "<group>"; };
 		7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureSummarizationTests.swift; sourceTree = "<group>"; };
@@ -338,6 +340,7 @@
 				863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */,
 				7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */,
 				7AA74B293F2A5E62A43E7C0F /* CallActivityTrackerTests.swift */,
+				6C91D3980F74A12D8DE11D0B /* FluidAudioLiveTests.swift */,
 				A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */,
 				D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */,
 				4521EC36BE99F9A454484BD5 /* LiveTranscriptTests.swift */,
@@ -572,6 +575,7 @@
 				7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */,
 				A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */,
 				340389F84DD5A415D748FEEA /* CallActivityTrackerTests.swift in Sources */,
+				75EDFEA44D8A248326FB54A5 /* FluidAudioLiveTests.swift in Sources */,
 				16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */,
 				B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */,
 				0CC8005DF93E6A82E11A2D44 /* LiveTranscriptTests.swift in Sources */,
@@ -954,8 +958,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.12.0;
+				kind = exactVersion;
+				version = 0.17.7;
 			};
 		};
 		65967AF301BB9A5F2E4A5627 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
