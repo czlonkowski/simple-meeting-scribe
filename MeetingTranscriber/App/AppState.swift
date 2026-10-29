@@ -905,6 +905,14 @@ final class AppState {
     var importPanelRequested: Bool = false
     var lastError: String? = nil
 
+    /// Draft text of the current (or last) recording, shown on the Record tab
+    /// and served by the `get_live_transcript` MCP tool.
+    let liveTranscript = LiveTranscript()
+    /// The Record tab's "Live transcript" switch. Not saved: every launch
+    /// starts with it off, and only that switch turns it on.
+    private(set) var liveTranscriptRequested = false
+    private var liveTranscriber: LiveTranscriber?
+
     // Collaborators
     private var detector: MeetingDetector?
     private var callDetector: CallDetector?
@@ -1087,6 +1095,7 @@ final class AppState {
             loggedMeetingAppMic = false
             LongRecordingNotifier.shared.prepare()
             startElapsedTimer(from: start)
+            if liveTranscriptRequested { startLiveTranscript(recordingStart: start) }
             if let url = meeting?.url { dismissedMeetingURLs.insert(url) }
             detectedMeeting = nil
         } catch {
@@ -1116,12 +1125,60 @@ final class AppState {
         recorder?.setMicMuted(muted)
     }
 
+    // MARK: – Live transcript
+
+    /// The Record tab switch. Works before and during a recording.
+    func setLiveTranscript(_ on: Bool) {
+        liveTranscriptRequested = on
+        guard case .recording(let startedAt, _, _) = recordingState else { return }
+        if on {
+            startLiveTranscript(recordingStart: startedAt)
+        } else {
+            stopLiveTranscript()
+        }
+    }
+
+    private func startLiveTranscript(recordingStart: Date) {
+        guard liveTranscriber == nil, let recorder else { return }
+        let transcriber = LiveTranscriber()
+        liveTranscriber = transcriber
+        liveTranscript.begin(recordingStart: recordingStart)
+        let tap = recorder.liveTap
+        let includeSystem = captureSystemAudio
+        Task {
+            do {
+                try await transcriber.start(tap: tap,
+                                            includeSystem: includeSystem,
+                                            recordingStart: recordingStart) { [weak self] speaker, start, text in
+                    self?.liveTranscript.append(speaker: speaker, start: start, text: text)
+                }
+                if liveTranscriber === transcriber { liveTranscript.markRunning() }
+            } catch {
+                Log.live.error("live transcript failed to start: \(error.localizedDescription, privacy: .public)")
+                guard liveTranscriber === transcriber else { return }
+                liveTranscriber = nil
+                liveTranscript.fail(error.localizedDescription)
+                await transcriber.stop()
+            }
+        }
+    }
+
+    /// Ends live text for this recording. The last few seconds still arrive
+    /// a moment later, while the stopped recording is already transcribing.
+    private func stopLiveTranscript() {
+        guard let transcriber = liveTranscriber else { return }
+        liveTranscriber = nil
+        liveTranscript.end()
+        Task { await transcriber.stop() }
+    }
+
     func stopRecording() async {
         guard case .recording(let startedAt, let meeting, let language) = recordingState else { return }
         recordingState = .stopping
         stopElapsedTimer()
         LongRecordingNotifier.shared.removeMeetingEndedPrompt()
         currentInputDeviceName = nil
+        stopLiveTranscript()
         guard let recorder = recorder else { recordingState = .idle; return }
         defer { self.recorder = nil }
         do {

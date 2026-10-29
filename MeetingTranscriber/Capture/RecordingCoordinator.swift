@@ -24,6 +24,8 @@ final class RecordingCoordinator {
     private var micStartDate: Date?
     private var videoStartOffset: TimeInterval?
     private var onVideoStatus: ((VideoCaptureStatus) -> Void)?
+    /// Copies of the mic and system samples for the live transcript.
+    let liveTap = LiveAudioTap()
 
     func start(captureSystemAudio: Bool,
                recordScreen: Bool,
@@ -42,7 +44,9 @@ final class RecordingCoordinator {
         self.captureSystem = captureSystemAudio
         self.onVideoStatus = onVideoStatus
 
+        let liveTap = liveTap
         mic.onSamples = { [weak writer] samples in
+            liveTap.send(samples, from: .mic)
             guard let writer else { return }
             await writer.appendMic(samples)
         }
@@ -56,6 +60,7 @@ final class RecordingCoordinator {
         if captureSystemAudio, let names = meeting?.tapProcessNames, !names.isEmpty {
             let tap = ProcessTapCapture(executableNames: names)
             tap.onSamples = { [weak writer] samples in
+                liveTap.send(samples, from: .system)
                 guard let writer else { return }
                 await writer.appendSystem(samples)
             }
@@ -69,6 +74,7 @@ final class RecordingCoordinator {
             }
         } else if captureSystemAudio {
             system.onSamples = { [weak writer] samples in
+                liveTap.send(samples, from: .system)
                 guard let writer else { return }
                 await writer.appendSystem(samples)
             }
@@ -76,6 +82,7 @@ final class RecordingCoordinator {
             // A stream rebuild costs real wall-clock time; pad the stem for it
             // or every later system segment drifts early against the mic stem.
             system.onGap = { [weak writer] seconds in
+                liveTap.sendSilence(seconds: seconds, from: .system)
                 await writer?.padSystem(seconds: seconds)
             }
             system.onStatus = onSystemAudioStatus
@@ -122,10 +129,12 @@ final class RecordingCoordinator {
 
     func setMicMuted(_ muted: Bool) {
         mic.setMuted(muted)
+        liveTap.setMicMuted(muted)
         Task { await writer?.setMicMuted(muted) }
     }
 
     func stop() async throws -> RecordedStems {
+        liveTap.detach()
         mic.stop()
         if let callTap {
             callTap.stop()

@@ -105,6 +105,31 @@ enum MCPTools {
                 "required": .array([.string("id"), .string("tags")])
             ]),
             annotations: Tool.Annotations(readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false)
+        ),
+        Tool(
+            name: "get_live_transcript",
+            description: """
+                Return the live draft transcript of the recording in progress \
+                (or of the last recording, until the app is restarted). It is \
+                made on device, lags speech by about 15 seconds, and only \
+                tells apart the user (mic) from everyone else (system audio, \
+                labelled "Others"). Returns JSON with `recording`, `status` \
+                (off, loading, running, or failed: …), `cursor`, and \
+                `transcript` (Markdown). Pass the `cursor` from the previous \
+                call to get only newer text. The live transcript is off \
+                unless the user turned it on in the app's Record tab. After \
+                the recording is transcribed, prefer get_transcript.
+                """,
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "cursor": .object([
+                        "type": .string("integer"),
+                        "description": .string("Optional `cursor` from an earlier call; only text added after it is returned.")
+                    ])
+                ])
+            ]),
+            annotations: Tool.Annotations(readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false)
         )
     ]
 
@@ -124,6 +149,9 @@ enum MCPTools {
         case "set_tags":
             let tags = arguments?["tags"]?.arrayValue?.compactMap { $0.stringValue }
             return await setTags(id: arguments?["id"]?.stringValue, tags: tags)
+        case "get_live_transcript":
+            let cursor = arguments?["cursor"].flatMap { $0.intValue ?? $0.doubleValue.map(Int.init) } ?? 0
+            return await getLiveTranscript(after: cursor)
         default:
             return errorResult("Unknown tool: \(name)")
         }
@@ -279,6 +307,37 @@ enum MCPTools {
         case .unknownID:
             return errorResult("No transcript found for id: \(id)")
         }
+    }
+
+    private static func getLiveTranscript(after cursor: Int) async -> CallTool.Result {
+        let payload = await MainActor.run { () -> [String: Any]? in
+            guard let app = AppState.shared else { return nil }
+            let live = app.liveTranscript
+            let status: String
+            switch live.status {
+            case .off: status = "off"
+            case .loading: status = "loading"
+            case .running: status = "running"
+            case .failed(let message): status = "failed: \(message)"
+            }
+            let newer = live.segments.filter { $0.id > cursor }
+            var payload: [String: Any] = [
+                "recording": app.recordingState.isRecording,
+                "status": status,
+                "cursor": live.cursor,
+                "transcript": LiveTranscriptFormat.markdown(
+                    newer, myName: LiveTranscriptFormat.displayName(for: app.userDisplayName)
+                )
+            ]
+            if let start = live.recordingStart {
+                payload["recordingStartedAt"] = ISO8601DateFormatter().string(from: start)
+            }
+            return payload
+        }
+        guard let payload else {
+            return errorResult("Meeting Transcriber app state is unavailable.")
+        }
+        return jsonResult(payload, fallback: "Failed to encode the live transcript.")
     }
 
     // MARK: - Helpers

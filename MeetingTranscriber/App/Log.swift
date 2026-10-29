@@ -20,4 +20,5 @@ enum Log {
     static let callDetection = Logger(subsystem: subsystem, category: "callDetection")
     static let meetingEnd    = Logger(subsystem: subsystem, category: "meetingEnd")
     static let updates       = Logger(subsystem: subsystem, category: "updates")
+    static let live          = Logger(subsystem: subsystem, category: "live")
 }

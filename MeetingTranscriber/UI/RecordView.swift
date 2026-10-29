@@ -14,6 +14,9 @@ struct RecordView: View {
                 header
                 stateCard
                 controls
+                if showsLivePanel {
+                    LiveTranscriptPanel()
+                }
                 Group {
                     if appState.isProcessing {
                         processingPanel
@@ -287,6 +290,8 @@ struct RecordView: View {
                 .toggleStyle(.switch)
                 .help("Record the meeting's browser window as video")
 
+                liveTranscriptToggle
+
                 Spacer(minLength: 0)
             }
 
@@ -385,6 +390,8 @@ struct RecordView: View {
                 .help("Start recording the meeting window now")
             }
 
+            liveTranscriptToggle
+
             Spacer()
 
             Button {
@@ -416,6 +423,23 @@ struct RecordView: View {
         guard let uid = appState.sessionInputDeviceUID, !uid.isEmpty,
               !appState.availableInputDevices.contains(where: { $0.uid == uid }) else { return nil }
         return uid
+    }
+
+    private var liveTranscriptToggle: some View {
+        Toggle(isOn: Binding(
+            get: { appState.liveTranscriptRequested },
+            set: { appState.setLiveTranscript($0) }
+        )) {
+            Label("Live transcript", systemImage: "captions.bubble")
+                .fixedSize()
+        }
+        .toggleStyle(.switch)
+        .help("Show a draft transcript while recording, made on this Mac. The usual transcript still replaces it when you stop.")
+    }
+
+    private var showsLivePanel: Bool {
+        let live = appState.liveTranscript
+        return live.status != .off || !live.segments.isEmpty
     }
 
     private var recordScreenBinding: Binding<Bool> {
