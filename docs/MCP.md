@@ -26,7 +26,7 @@ client on the same Mac) can list, read, filter, and tag your transcripts.
 | `get_transcript` | `id` (required) | The full markdown transcript |
 | `get_summary` | `id` (required) | Markdown with the LLM summary, action items, and the model + timestamp. Errors if the transcript hasn't been summarized yet. |
 | `set_tags` | `id` (required), `tags` (required array) | Replaces the transcript's full tag list and returns `{ id, tags }`. Unknown tag names are auto-created in the managed catalog. |
-| `get_live_transcript` | `cursor` (optional integer from the previous call) | JSON `{ recording, status, cursor, recordingStartedAt, transcript }`. `transcript` is Markdown of the live draft added after `cursor`. Live text exists only when the user turned on **Live transcript** on the Record tab; it lags speech by about 15 s and only separates the user (mic) from "Others" (system audio). |
+| `get_live_transcript` | `cursor` (optional integer from the previous call) | JSON `{ recording, status, cursor, recordingStartedAt, transcript }`. `transcript` is Markdown of the live draft added after `cursor`. Live text exists only when the user turned on **Live transcript** on the Record tab; it comes from Azure Speech real-time recognition when an Azure Speech key is set (about 1 s behind), otherwise from Parakeet on device (about 15 s behind), and only separates the user (mic) from "Others" (system audio). Text still being spoken is never returned. |
 
 `set_tags` uses replace semantics: to add one tag, first read the current
 `tags` field from `list_transcripts`, append the new tag client-side, then

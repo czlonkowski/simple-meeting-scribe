@@ -7,23 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		006212892CE14D0E5F6FB319 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 51BDA5EA8814104B5A438BDA /* Sparkle */; };
 		00E3D8458EC85CB989E92FE7 /* MAISegmenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31F58F4E87E62C950348C035 /* MAISegmenterTests.swift */; };
 		03334F45D302DA0802321EF6 /* SetupDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE4FF9F790608D75403B7A6 /* SetupDefaultsTests.swift */; };
 		0CC8005DF93E6A82E11A2D44 /* LiveTranscriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4521EC36BE99F9A454484BD5 /* LiveTranscriptTests.swift */; };
+		0FA24B2659F620927AE5CF31 /* LiveEngineBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C757B0D0CD270273A2F7F93D /* LiveEngineBenchmarkTests.swift */; };
 		0FD9E14CF2C87AC7A4AF2136 /* MixedAudioExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7F2B018F13905073BE6C30 /* MixedAudioExporterTests.swift */; };
 		111A721E7899FA819F95F829 /* MeetingEndTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7E5A3661A6773B90AB7000 /* MeetingEndTrackerTests.swift */; };
-		113CA20A70CB3CA14CF23E71 /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 293C7021B9086A3D9C1B53C9 /* MCP */; };
+		113CA20A70CB3CA14CF23E71 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 0776F4BCF2B813ACC5E0CC42 /* HuggingFace */; };
 		16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */; };
-		1720D07E50CB1A0EBFF74B70 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 022F5C4E781FD3B3C2A72941 /* Tokenizers */; };
+		1720D07E50CB1A0EBFF74B70 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = F9445D33B6D9FF2FF3EE56DC /* MLXVLM */; };
 		1B7FA6D5530FE109DE4E68EE /* TranscriptMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFCAADFF16701FAABD36947 /* TranscriptMergerTests.swift */; };
 		21DAC638DE2E4DE0D4C20FEC /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B9C8A0387E7A87C2517C2A /* Log.swift */; };
 		22CDE25A5568BCEAD5BA787B /* SystemAudioHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C68BE6DFD8EB0621B47265 /* SystemAudioHealth.swift */; };
 		243AF48B0DBC19B012794073 /* SpeakerCorrectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D37221CBF34EB74CBF34077 /* SpeakerCorrectionTests.swift */; };
 		244B05E7297E189047B9B569 /* SummaryPrompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3853E93A2C23F7C34E06B9 /* SummaryPrompts.swift */; };
 		25CC8EB4ABB05E2D87F8FE4F /* MixedAudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628FC3EB4444FF503DC407A7 /* MixedAudioExporter.swift */; };
+		28A54AB4095E160E66C9E723 /* AzureLiveStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394A08F5C88C685777EC9230 /* AzureLiveStreamTests.swift */; };
 		2A45E9953A2F41E23648668C /* UpdateControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D2A5EC718BF4F7E6A7C696 /* UpdateControllerTests.swift */; };
 		2AD40271BB8DAC23E08BD939 /* AudioPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DBF4A5AA0765B8AC813D0A /* AudioPlayerCard.swift */; };
-		2B949EB0180E613EB8577CF0 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A22BC7E86E01210214EADBA8 /* MLXLLM */; };
+		2B949EB0180E613EB8577CF0 /* MicrosoftCognitiveServicesSpeech-macOS in Frameworks */ = {isa = PBXBuildFile; productRef = 1DF6DAA5ECD371AB2CBD37E9 /* MicrosoftCognitiveServicesSpeech-macOS */; };
 		2BBAC52BB8161EEE5E180C56 /* WordReplacementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD253098B51F28EB52CB220 /* WordReplacementService.swift */; };
 		2CEEF2595E69E677AEF89E33 /* ImportFileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DF34BD84516093E582B6AD /* ImportFileSheet.swift */; };
 		2E99110D5633D28565C2B15A /* MixerWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0100D04561D3DA136184D52 /* MixerWriter.swift */; };
@@ -31,6 +34,7 @@
 		340D07201831E00D197E1F02 /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747B97F80070E768617576E9 /* MCPTools.swift */; };
 		34DF45DFF7A8567BA2A8D539 /* MeetingTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78BB74557480491478111DD /* MeetingTranscriberApp.swift */; };
 		372BE3AE343ECE4A90D30F6E /* TagStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7553778A8A8B77A6E443E32C /* TagStore.swift */; };
+		375606A8394D28D6DA1C24DE /* AzureLiveStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76C528F544BCEC5FB114973 /* AzureLiveStream.swift */; };
 		4284E5DF07B438BFFDBA023B /* RecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C08E8F4B6F85AE23697D53 /* RecordView.swift */; };
 		43BB2DFE3FAA6994DF29D2C5 /* ProcessScriptRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57920CC8168C694C339B133 /* ProcessScriptRunnerTests.swift */; };
 		44D42EDA36B30BF7DB95C988 /* LanguageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D06AD4E21191BEAF30724A64 /* LanguageModel.swift */; };
@@ -55,7 +59,7 @@
 		63967859598B595EC4976361 /* CallActivityTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03945A0B6B94DF60C96EA71 /* CallActivityTracker.swift */; };
 		643785A6A98C4C07BBFEA89A /* MAITranscribeEngineLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD3F9EA94001A3B77013503 /* MAITranscribeEngineLiveTests.swift */; };
 		65CF28EAD34E2693E52BBF81 /* SystemAudioHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9522066AD2C772F887AEBA34 /* SystemAudioHealthTests.swift */; };
-		66407E8C799AC339A6CCEE49 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 0776F4BCF2B813ACC5E0CC42 /* HuggingFace */; };
+		66407E8C799AC339A6CCEE49 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 022F5C4E781FD3B3C2A72941 /* Tokenizers */; };
 		66F7EA707009D758AE93CC0B /* SystemStemAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8962C7B76F2E96924E243CD /* SystemStemAnalyzer.swift */; };
 		6774761336C49091EB654940 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956B473FF8328A5939AFAC93 /* AudioRecorder.swift */; };
 		691C9A5CB146B9B0172127E6 /* AudioMixdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F105B4670016A20D4E3C3232 /* AudioMixdown.swift */; };
@@ -64,7 +68,7 @@
 		72D33399D64CF1E46D037259 /* MeetingEndTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D428A1BB47E19F0C45EB3C25 /* MeetingEndTracker.swift */; };
 		75EDFEA44D8A248326FB54A5 /* FluidAudioLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C91D3980F74A12D8DE11D0B /* FluidAudioLiveTests.swift */; };
 		7638A4BDEE638058887A3F4A /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64005F4AC02855F2487ED608 /* ScreenRecorder.swift */; };
-		76768FF6CFDBFF736A6DC54A /* MLXHuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 1AD471B4C39D22F7B5C4F309 /* MLXHuggingFace */; };
+		76768FF6CFDBFF736A6DC54A /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 83824903C28D6B7CD12C27C1 /* MLXLMCommon */; };
 		779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC129E33DD25FDF3CA452C9 /* AzureDeploymentEditor.swift */; };
 		7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */; };
 		7C2C912AEFC7627E0D6D3834 /* InputDeviceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34215358EE13E745C5772DB8 /* InputDeviceSelection.swift */; };
@@ -81,7 +85,7 @@
 		9EBEDAB8745E070C6B1CBF74 /* ParakeetEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07118CE8E743DE6F1110C42E /* ParakeetEngine.swift */; };
 		A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */; };
 		A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */; };
-		A3EEF01BC86F4412AD0CF2F4 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 83824903C28D6B7CD12C27C1 /* MLXLMCommon */; };
+		A3EEF01BC86F4412AD0CF2F4 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A22BC7E86E01210214EADBA8 /* MLXLLM */; };
 		A4EDB35392CFE4215DF3A890 /* MAITranscribeEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7C63070B950873957610F6 /* MAITranscribeEngineTests.swift */; };
 		A5846FBDEF3A1A2D7911C7D6 /* WhisperModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D14FDA8F76E58108013778 /* WhisperModelTests.swift */; };
 		A8D06AAF42BE0BC04AD6A296 /* SetupAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F66A6655F4010A1A2AFC43 /* SetupAssistantView.swift */; };
@@ -97,12 +101,12 @@
 		B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */; };
 		BE597539792C85FAE74C00E9 /* TranscriptDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50878A9F431694BAFD646321 /* TranscriptDetailView.swift */; };
 		BE8E98EFCFDD5FC6E3A6CA32 /* MAISegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28418CE4CF8D9BE84F010DD7 /* MAISegmenter.swift */; };
-		C03DFCDB27987D06D6E28CB3 /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = F9445D33B6D9FF2FF3EE56DC /* MLXVLM */; };
+		C03DFCDB27987D06D6E28CB3 /* MLXHuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 1AD471B4C39D22F7B5C4F309 /* MLXHuggingFace */; };
 		C079EDEFCB5C2A53ACDE9838 /* AzureDeployment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2090EEE4DE0CDE241F604ED7 /* AzureDeployment.swift */; };
 		C5986FA66B79453646B53B7D /* DiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8736328A617B6DE411A50A01 /* DiarizationEngine.swift */; };
 		C64833D83A5AF134F82AB534 /* RecordingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159BFB364327253A27D37567 /* RecordingCoordinator.swift */; };
 		C75550865153434635D44405 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5861A952DB8166D0C30E7D34 /* Assets.xcassets */; };
-		CD734B754C0783054DCF0E3F /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 51BDA5EA8814104B5A438BDA /* Sparkle */; };
+		CD734B754C0783054DCF0E3F /* MCP in Frameworks */ = {isa = PBXBuildFile; productRef = 293C7021B9086A3D9C1B53C9 /* MCP */; };
 		CEA6860D265CC772C9A30FF9 /* LiveAudioTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D16ED59FF5E0CE6DA8B3109 /* LiveAudioTap.swift */; };
 		D7380D9762289D46E35DAECB /* WhisperEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DD73103EF9029FE0045631 /* WhisperEngine.swift */; };
 		DAF20D738FE4935C93466CF3 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B1F17182686AEEE558E198 /* RootView.swift */; };
@@ -151,6 +155,7 @@
 		34215358EE13E745C5772DB8 /* InputDeviceSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDeviceSelection.swift; sourceTree = "<group>"; };
 		34E5DB6F7D1679AB8FCDE266 /* TranscriptStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStoreTests.swift; sourceTree = "<group>"; };
 		37E393348DDB824DD57C8DED /* SummaryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryModel.swift; sourceTree = "<group>"; };
+		394A08F5C88C685777EC9230 /* AzureLiveStreamTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureLiveStreamTests.swift; sourceTree = "<group>"; };
 		398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongRecordingAlertTests.swift; sourceTree = "<group>"; };
 		4246F4B0562F70223BDBE3AF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4521EC36BE99F9A454484BD5 /* LiveTranscriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranscriptTests.swift; sourceTree = "<group>"; };
@@ -204,6 +209,8 @@
 		B6ABDE44BDC61598CB0A80C1 /* VideoPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerCard.swift; sourceTree = "<group>"; };
 		BC3853E93A2C23F7C34E06B9 /* SummaryPrompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryPrompts.swift; sourceTree = "<group>"; };
 		C2F66A6655F4010A1A2AFC43 /* SetupAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupAssistantView.swift; sourceTree = "<group>"; };
+		C757B0D0CD270273A2F7F93D /* LiveEngineBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEngineBenchmarkTests.swift; sourceTree = "<group>"; };
+		C76C528F544BCEC5FB114973 /* AzureLiveStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzureLiveStream.swift; sourceTree = "<group>"; };
 		C8962C7B76F2E96924E243CD /* SystemStemAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStemAnalyzer.swift; sourceTree = "<group>"; };
 		C9D14FDA8F76E58108013778 /* WhisperModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperModelTests.swift; sourceTree = "<group>"; };
 		CB7E5A3661A6773B90AB7000 /* MeetingEndTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingEndTrackerTests.swift; sourceTree = "<group>"; };
@@ -239,14 +246,15 @@
 			files = (
 				87348EDA9294BD109B7D3B00 /* WhisperKit in Frameworks */,
 				B2CB805A5DD61E2119A641AE /* FluidAudio in Frameworks */,
-				2B949EB0180E613EB8577CF0 /* MLXLLM in Frameworks */,
-				A3EEF01BC86F4412AD0CF2F4 /* MLXLMCommon in Frameworks */,
-				76768FF6CFDBFF736A6DC54A /* MLXHuggingFace in Frameworks */,
-				C03DFCDB27987D06D6E28CB3 /* MLXVLM in Frameworks */,
-				1720D07E50CB1A0EBFF74B70 /* Tokenizers in Frameworks */,
-				66407E8C799AC339A6CCEE49 /* HuggingFace in Frameworks */,
-				113CA20A70CB3CA14CF23E71 /* MCP in Frameworks */,
-				CD734B754C0783054DCF0E3F /* Sparkle in Frameworks */,
+				2B949EB0180E613EB8577CF0 /* MicrosoftCognitiveServicesSpeech-macOS in Frameworks */,
+				A3EEF01BC86F4412AD0CF2F4 /* MLXLLM in Frameworks */,
+				76768FF6CFDBFF736A6DC54A /* MLXLMCommon in Frameworks */,
+				C03DFCDB27987D06D6E28CB3 /* MLXHuggingFace in Frameworks */,
+				1720D07E50CB1A0EBFF74B70 /* MLXVLM in Frameworks */,
+				66407E8C799AC339A6CCEE49 /* Tokenizers in Frameworks */,
+				113CA20A70CB3CA14CF23E71 /* HuggingFace in Frameworks */,
+				CD734B754C0783054DCF0E3F /* MCP in Frameworks */,
+				006212892CE14D0E5F6FB319 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,11 +346,13 @@
 			isa = PBXGroup;
 			children = (
 				863864831D401D9E82F4EAE6 /* AudioRecorderLiveTests.swift */,
+				394A08F5C88C685777EC9230 /* AzureLiveStreamTests.swift */,
 				7614BD15ED526FAFA9345A7C /* AzureSummarizationTests.swift */,
 				7AA74B293F2A5E62A43E7C0F /* CallActivityTrackerTests.swift */,
 				6C91D3980F74A12D8DE11D0B /* FluidAudioLiveTests.swift */,
 				A39D219D6996CF506738CD6C /* InputDevicePreferenceTests.swift */,
 				D9C98B53E13319F5C5271D0B /* InputDeviceSelectionTests.swift */,
+				C757B0D0CD270273A2F7F93D /* LiveEngineBenchmarkTests.swift */,
 				4521EC36BE99F9A454484BD5 /* LiveTranscriptTests.swift */,
 				398091E86AD1A2D3349FCAC5 /* LongRecordingAlertTests.swift */,
 				31F58F4E87E62C950348C035 /* MAISegmenterTests.swift */,
@@ -371,6 +381,7 @@
 			isa = PBXGroup;
 			children = (
 				F105B4670016A20D4E3C3232 /* AudioMixdown.swift */,
+				C76C528F544BCEC5FB114973 /* AzureLiveStream.swift */,
 				8736328A617B6DE411A50A01 /* DiarizationEngine.swift */,
 				951BE3AAAB743F45970EF793 /* LiveTranscriber.swift */,
 				28418CE4CF8D9BE84F010DD7 /* MAISegmenter.swift */,
@@ -476,6 +487,7 @@
 			packageProductDependencies = (
 				EC8545E2DC0567358173AD7B /* WhisperKit */,
 				65D1F7A9D75E67197310662E /* FluidAudio */,
+				1DF6DAA5ECD371AB2CBD37E9 /* MicrosoftCognitiveServicesSpeech-macOS */,
 				A22BC7E86E01210214EADBA8 /* MLXLLM */,
 				83824903C28D6B7CD12C27C1 /* MLXLMCommon */,
 				1AD471B4C39D22F7B5C4F309 /* MLXHuggingFace */,
@@ -538,6 +550,7 @@
 			packageReferences = (
 				6528DB1206624F6040F060E8 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				65967AF301BB9A5F2E4A5627 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				00FF69B15656B056E49ACFC7 /* XCRemoteSwiftPackageReference "speech-sdk-spm" */,
 				D12BCD6718BEF1AF608CBEEC /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				2066287E7399F3E26F676AB4 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				E64BA634271243D70AA91E8C /* XCRemoteSwiftPackageReference "swift-huggingface" */,
@@ -573,11 +586,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				7A8A530ADA1D331A8D5632A9 /* AudioRecorderLiveTests.swift in Sources */,
+				28A54AB4095E160E66C9E723 /* AzureLiveStreamTests.swift in Sources */,
 				A1889E08B0DC2A2CE1D8C362 /* AzureSummarizationTests.swift in Sources */,
 				340389F84DD5A415D748FEEA /* CallActivityTrackerTests.swift in Sources */,
 				75EDFEA44D8A248326FB54A5 /* FluidAudioLiveTests.swift in Sources */,
 				16CD758D6B62BC4B5B9B8D91 /* InputDevicePreferenceTests.swift in Sources */,
 				B64A18F0B3F1892DBC8834FC /* InputDeviceSelectionTests.swift in Sources */,
+				0FA24B2659F620927AE5CF31 /* LiveEngineBenchmarkTests.swift in Sources */,
 				0CC8005DF93E6A82E11A2D44 /* LiveTranscriptTests.swift in Sources */,
 				A1030EA0F4961EC3335B5BCF /* LongRecordingAlertTests.swift in Sources */,
 				00E3D8458EC85CB989E92FE7 /* MAISegmenterTests.swift in Sources */,
@@ -611,6 +626,7 @@
 				6774761336C49091EB654940 /* AudioRecorder.swift in Sources */,
 				C079EDEFCB5C2A53ACDE9838 /* AzureDeployment.swift in Sources */,
 				779AA9D39CC33001FB133063 /* AzureDeploymentEditor.swift in Sources */,
+				375606A8394D28D6DA1C24DE /* AzureLiveStream.swift in Sources */,
 				572307D9BDF9EAFC77050A95 /* AzureOpenAIClient.swift in Sources */,
 				8CDE1BB3AA1C09720FAF1868 /* BrowserURLQuery.swift in Sources */,
 				63967859598B595EC4976361 /* CallActivityTracker.swift in Sources */,
@@ -938,6 +954,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		00FF69B15656B056E49ACFC7 /* XCRemoteSwiftPackageReference "speech-sdk-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/speech-sdk-spm";
+			requirement = {
+				kind = exactVersion;
+				version = 1.53.0;
+			};
+		};
 		06EF507F29CBDA27CCB63B37 /* XCRemoteSwiftPackageReference "swift-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk";
@@ -1011,6 +1035,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2066287E7399F3E26F676AB4 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXHuggingFace;
+		};
+		1DF6DAA5ECD371AB2CBD37E9 /* MicrosoftCognitiveServicesSpeech-macOS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 00FF69B15656B056E49ACFC7 /* XCRemoteSwiftPackageReference "speech-sdk-spm" */;
+			productName = "MicrosoftCognitiveServicesSpeech-macOS";
 		};
 		293C7021B9086A3D9C1B53C9 /* MCP */ = {
 			isa = XCSwiftPackageProductDependency;

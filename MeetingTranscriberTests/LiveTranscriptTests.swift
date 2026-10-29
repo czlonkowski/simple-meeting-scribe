@@ -122,3 +122,26 @@ final class LiveAudioTapTests: XCTestCase {
         XCTAssertEqual(total, 40_000)
     }
 }
+
+@MainActor
+final class LiveTranscriptPartialTests: XCTestCase {
+
+    func testFinalTextReplacesThatSpeakersPartial() {
+        let live = LiveTranscript()
+        live.begin(recordingStart: Date())
+        live.setPartial("Dzień do", for: .others)
+        live.setPartial("Hello", for: .me)
+        live.append(speaker: .others, start: 0, text: "Dzień dobry.")
+        XCTAssertNil(live.partial[.others])
+        XCTAssertEqual(live.partial[.me], "Hello")
+    }
+
+    func testPartialsAreNeverInTheCopiedOrServedText() {
+        let live = LiveTranscript()
+        live.begin(recordingStart: Date())
+        live.setPartial("still talking", for: .me)
+        XCTAssertEqual(LiveTranscriptFormat.markdown(live.segments, myName: "You"), "")
+        live.end()
+        XCTAssertTrue(live.partial.isEmpty)
+    }
+}

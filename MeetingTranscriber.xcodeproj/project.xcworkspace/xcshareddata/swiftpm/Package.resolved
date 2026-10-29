@@ -1,5 +1,5 @@
 {
-  "originHash" : "1a3d47f0d89162ab60b51c70c9984299769d8d390bd9d4531b6c10e51b78347b",
+  "originHash" : "aeaf04cb0923f3da5f5a1eb9848d5b149f07eb7a0e0edfe69f66c5891293aaef",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "eef1a539a373c1f1a320624b1130fc5de7b2e100",
         "version" : "2.10.0"
+      }
+    },
+    {
+      "identity" : "speech-sdk-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/microsoft/speech-sdk-spm",
+      "state" : {
+        "revision" : "bdc4881d2d123902c1a8ef22e8d121302d5a83e9",
+        "version" : "1.53.0"
       }
     },
     {

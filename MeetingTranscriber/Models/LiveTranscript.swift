@@ -39,7 +39,19 @@ final class LiveTranscript {
         case failed(String)
     }
 
+    /// What is producing the text.
+    enum Engine: Equatable {
+        case azure
+        case onDevice
+        /// Azure is set up but failed, so Parakeet took over.
+        case onDeviceFallback
+    }
+
     private(set) var status: Status = .off
+    private(set) var engine: Engine?
+    /// Per speaker, the sentence being heard right now (Azure only). It may
+    /// still change, so it is shown but never copied or served over MCP.
+    private(set) var partial: [LiveSpeaker: String] = [:]
     /// Sorted by `start`.
     private(set) var segments: [LiveSegment] = []
     /// Start of the recording these segments belong to.
@@ -59,6 +71,11 @@ final class LiveTranscript {
             self.recordingStart = recordingStart
         }
         status = .loading
+        engine = nil
+    }
+
+    func setEngine(_ engine: Engine) {
+        self.engine = engine
     }
 
     func markRunning() {
@@ -71,16 +88,24 @@ final class LiveTranscript {
 
     func end() {
         status = .off
+        partial = [:]
+    }
+
+    func setPartial(_ text: String?, for speaker: LiveSpeaker) {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        partial[speaker] = trimmed.isEmpty ? nil : trimmed
     }
 
     func clear() {
         segments = []
         nextID = 1
         recordingStart = nil
+        partial = [:]
         if case .failed = status { status = .off }
     }
 
     func append(speaker: LiveSpeaker, start: TimeInterval, text: String) {
+        partial[speaker] = nil
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let segment = LiveSegment(id: nextID, speaker: speaker, start: max(0, start), text: trimmed)

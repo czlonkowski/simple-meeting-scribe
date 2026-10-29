@@ -1145,13 +1145,26 @@ final class AppState {
         liveTranscript.begin(recordingStart: recordingStart)
         let tap = recorder.liveTap
         let includeSystem = captureSystemAudio
+        let replacements = wordReplacements
+        let azure = liveAzureSettings()
         Task {
             do {
-                try await transcriber.start(tap: tap,
-                                            includeSystem: includeSystem,
-                                            recordingStart: recordingStart) { [weak self] speaker, start, text in
-                    self?.liveTranscript.append(speaker: speaker, start: start, text: text)
-                }
+                try await transcriber.start(
+                    tap: tap,
+                    includeSystem: includeSystem,
+                    recordingStart: recordingStart,
+                    azure: azure,
+                    onText: { [weak self] speaker, start, text in
+                        self?.liveTranscript.append(speaker: speaker, start: start,
+                                                    text: WordReplacementService.apply(replacements, to: text))
+                    },
+                    onPartial: { [weak self] speaker, text in
+                        self?.liveTranscript.setPartial(text.map { WordReplacementService.apply(replacements, to: $0) },
+                                                        for: speaker)
+                    },
+                    onEngine: { [weak self] engine in
+                        self?.liveTranscript.setEngine(engine)
+                    })
                 if liveTranscriber === transcriber { liveTranscript.markRunning() }
             } catch {
                 Log.live.error("live transcript failed to start: \(error.localizedDescription, privacy: .public)")
@@ -1161,6 +1174,21 @@ final class AppState {
                 await transcriber.stop()
             }
         }
+    }
+
+    /// Azure Speech real-time settings for the live transcript, or nil when
+    /// no Azure Speech key and endpoint are set (Parakeet on device is used).
+    /// The locale follows the recording language at the moment it starts.
+    private func liveAzureSettings() -> LiveTranscriber.AzureSettings? {
+        let endpoint = azureSpeechEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = azureSpeechKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !endpoint.isEmpty, !key.isEmpty else { return nil }
+        let language: TranscriptionLanguage
+        if case .recording(_, _, let current) = recordingState { language = current } else { language = defaultLanguage }
+        return .init(endpoint: endpoint,
+                     key: key,
+                     locale: AzureLiveStream.locale(for: language),
+                     phrases: MAISegmenter.phraseHints(glossary: glossaryTerms, replacements: wordReplacements))
     }
 
     /// Ends live text for this recording. The last few seconds still arrive

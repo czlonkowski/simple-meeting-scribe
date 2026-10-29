@@ -110,10 +110,11 @@ enum MCPTools {
             name: "get_live_transcript",
             description: """
                 Return the live draft transcript of the recording in progress \
-                (or of the last recording, until the app is restarted). It is \
-                made on device, lags speech by about 15 seconds, and only \
-                tells apart the user (mic) from everyone else (system audio, \
-                labelled "Others"). Returns JSON with `recording`, `status` \
+                (or of the last recording, until the app is restarted). It \
+                comes from Azure Speech real-time recognition (about 1 second \
+                behind) or, without Azure, from an on-device model (about 15 \
+                seconds behind), and only tells apart the user (mic) from \
+                everyone else (system audio, labelled "Others"). Returns JSON with `recording`, `status` \
                 (off, loading, running, or failed: …), `cursor`, and \
                 `transcript` (Markdown). Pass the `cursor` from the previous \
                 call to get only newer text. The live transcript is off \

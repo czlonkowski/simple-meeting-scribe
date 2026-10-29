@@ -434,7 +434,7 @@ struct RecordView: View {
                 .fixedSize()
         }
         .toggleStyle(.switch)
-        .help("Show a draft transcript while recording, made on this Mac. The usual transcript still replaces it when you stop.")
+        .help("Show a draft transcript while recording: Azure Speech when its key is set, otherwise made on this Mac. The usual transcript still replaces it when you stop.")
     }
 
     private var showsLivePanel: Bool {

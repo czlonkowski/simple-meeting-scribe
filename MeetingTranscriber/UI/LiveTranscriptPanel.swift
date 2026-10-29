@@ -78,9 +78,12 @@ struct LiveTranscriptPanel: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         case .running:
-            Text("Draft · about 15 s behind")
+            Text(runningLabel)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(live.engine == .onDeviceFallback ? Color.orange : .secondary)
+                .help(live.engine == .onDeviceFallback
+                      ? "Azure Speech failed, so this Mac transcribes the rest of the recording."
+                      : "A draft. The usual transcript replaces it when you stop.")
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
@@ -95,6 +98,14 @@ struct LiveTranscriptPanel: View {
         }
     }
 
+    private var runningLabel: String {
+        switch live.engine {
+        case .azure: return "Azure Speech · about 1 s behind"
+        case .onDeviceFallback: return "On this Mac (Azure failed) · about 15 s behind"
+        case .onDevice, nil: return "On this Mac · about 15 s behind"
+        }
+    }
+
     private var isFailed: Bool {
         if case .failed = live.status { return true }
         return false
@@ -105,9 +116,14 @@ struct LiveTranscriptPanel: View {
     @ViewBuilder
     private var content: some View {
         let turns = LiveTranscriptFormat.turns(live.segments)
-        if turns.isEmpty {
+        let partials = [LiveSpeaker.me, .others].compactMap { speaker in
+            live.partial[speaker].map { (speaker, $0) }
+        }
+        if turns.isEmpty && partials.isEmpty {
             Text(live.status == .running || live.status == .loading
-                 ? "Text appears here about 15 seconds after it is said."
+                 ? (live.engine == .azure
+                    ? "Text appears here at the end of each sentence."
+                    : "Text appears here about 15 seconds after it is said.")
                  : "No live text.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -117,6 +133,9 @@ struct LiveTranscriptPanel: View {
                 LazyVStack(alignment: .leading, spacing: Theme.space6) {
                     ForEach(turns) { turn in
                         LiveTurnRow(turn: turn, myName: myName)
+                    }
+                    ForEach(partials, id: \.0) { speaker, text in
+                        LivePartialRow(name: speaker == .me ? myName : "Others", speaker: speaker, text: text)
                     }
                 }
                 .padding(.trailing, Theme.space4)
@@ -130,7 +149,7 @@ struct LiveTranscriptPanel: View {
             } action: { _, atBottom in
                 followsLatest = atBottom
             }
-            .onChange(of: live.cursor) {
+            .onChange(of: scrollTrigger) {
                 guard followsLatest else { return }
                 if reduceMotion {
                     scrollPosition.scrollTo(edge: .bottom)
@@ -139,6 +158,11 @@ struct LiveTranscriptPanel: View {
                 }
             }
         }
+    }
+
+    /// Changes whenever new final or interim text arrives.
+    private var scrollTrigger: String {
+        "\(live.cursor)|\(live.partial[.me]?.count ?? 0)|\(live.partial[.others]?.count ?? 0)"
     }
 
     private func copy(_ segments: [LiveSegment], label: String) {
@@ -174,5 +198,26 @@ private struct LiveTurnRow: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// The sentence being heard right now. Greyed out because it may change.
+private struct LivePartialRow: View {
+    let name: String
+    let speaker: LiveSpeaker
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.space2) {
+            Text(name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(speaker == .me ? Theme.speakerColor(for: 0) : Theme.speakerColor(for: 1))
+                .opacity(0.6)
+            Text(text)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityLabel("\(name), still speaking: \(text)")
     }
 }
