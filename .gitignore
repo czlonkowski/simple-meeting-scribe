@@ -13,6 +13,15 @@ MeetingTranscriber.xcodeproj/*
 xcuserdata/
 Package.resolved
 !scripts/release/Package.resolved
+# Pinned package versions for the app. Change them on purpose:
+# edit project.yml, then `xcodebuild -resolvePackageDependencies`.
+!MeetingTranscriber.xcodeproj/project.xcworkspace/
+MeetingTranscriber.xcodeproj/project.xcworkspace/*
+!MeetingTranscriber.xcodeproj/project.xcworkspace/xcshareddata/
+MeetingTranscriber.xcodeproj/project.xcworkspace/xcshareddata/*
+!MeetingTranscriber.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+MeetingTranscriber.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/*
+!MeetingTranscriber.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # Generated app icons (regenerate with scripts/generate_app_icon.swift)
 MeetingTranscriber/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png
