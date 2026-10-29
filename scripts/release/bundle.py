@@ -27,6 +27,10 @@ def macho_files(app):
 
 FEED_URL = "https://github.com/czlonkowski/simple-meeting-scribe/releases/latest/download/appcast.xml"
 SPARKLE = "Contents/Frameworks/Sparkle.framework"
+SPEECH = "Contents/Frameworks/MicrosoftCognitiveServicesSpeech.framework"
+# The Speech SDK's license and notices ship with its binary, not its package repo.
+SPEECH_ARTIFACT = "artifacts/speech-sdk-spm/MicrosoftCognitiveServicesSpeech-macOS"
+SPEECH_NOTICES = ["LICENSE.md", "ThirdPartyNotices.md", "REDIST.txt"]
 
 
 def prune_sparkle(app):
@@ -44,6 +48,13 @@ def prune_sparkle(app):
             subprocess.run(["lipo", binary, "-thin", "arm64", "-output", binary], check=True)
 
 
+def thin_speech_sdk(app):
+    # The Speech SDK ships a universal binary; the release is arm64 only.
+    for binary in macho_files(app / SPEECH):
+        if run("lipo", "-archs", binary) != "arm64":
+            subprocess.run(["lipo", binary, "-thin", "arm64", "-output", binary], check=True)
+
+
 def set_feed(app, feed_url):
     """Point a test build at another appcast before it is signed."""
     path = app / "Contents/Info.plist"
@@ -54,6 +65,7 @@ def set_feed(app, feed_url):
 
 def prepare(app, packages, lame):
     prune_sparkle(app)
+    thin_speech_sdk(app)
     helpers = app / "Contents/Helpers"
     helpers.mkdir(parents=True, exist_ok=True)
     shutil.copy2(lame / "lame", helpers / "lame")
@@ -104,6 +116,12 @@ def prepare(app, packages, lame):
                 nested = destination / notice.relative_to(checkout)
                 nested.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(notice, nested)
+    speech = third_party / "MicrosoftCognitiveServicesSpeech"
+    speech.mkdir()
+    for name in SPEECH_NOTICES:
+        source = packages / SPEECH_ARTIFACT / name
+        require(source.is_file(), f"Missing Speech SDK notice: {name}; review before distributing")
+        shutil.copy2(source, speech / name)
     shutil.copy2(ROOT / "scripts/release/Package.resolved", third_party / "Package.resolved")
 
 
@@ -123,7 +141,8 @@ def verify(app, signed=False, feed_url=FEED_URL):
     require(info["LSMinimumSystemVersion"] == "26.0", "Unexpected minimum macOS version")
     require(info["CFBundlePackageType"] == "APPL", "Not an application bundle")
     for relative in ["Contents/Helpers/lame", "Contents/Resources/AppIcon.icns",
-                     "Contents/Resources/meeting-patterns.json", "Contents/Resources/ThirdParty/LAME/COPYING"]:
+                     "Contents/Resources/meeting-patterns.json", "Contents/Resources/ThirdParty/LAME/COPYING",
+                     "Contents/Resources/ThirdParty/MicrosoftCognitiveServicesSpeech/LICENSE.md"]:
         require((app / relative).is_file(), f"Missing release resource: {relative}")
     require(list(app.rglob("*.metallib")), "Missing MLX Metal library")
     require(not list(app.rglob("*.xctest")), "Test bundle included in release")
