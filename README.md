@@ -23,6 +23,8 @@ it, reshape it — it's yours.
   button appears when you leave the meeting or after 3 minutes of silence.
 - Keeps your mic and the meeting audio as two tracks, so the transcript can tell
   "You" from the other side. Optionally records the meeting window as video.
+- Optional live transcript while you record (Azure Speech, or Parakeet on your
+  Mac), readable by Claude over MCP.
 
 **Transcribe**
 - Cloud: Microsoft MAI-Transcribe-2 (Azure Speech, the default) or ElevenLabs
@@ -36,7 +38,20 @@ it, reshape it — it's yours.
 **Summarize**
 - Summary, action items and a title, on-device with
   [MLX](https://github.com/ml-explore/mlx-swift-lm) or with your own Azure
-  OpenAI deployments. Pick the model per meeting.
+  OpenAI deployments. Pick the model per meeting, or let every new transcript
+  be summarized automatically.
+
+**Automate with n8n**
+- **Send to n8n** posts a transcript as JSON — metadata, tags, speakers,
+  summary, Markdown and timed segments — to your own webhook with your own
+  auth header. Every transcript has a stable `id` and a `contentHash`, so the
+  workflow can deduplicate. It can also send each new transcript on its own.
+- **Meeting lookup** asks a second webhook, before each summary, which calendar
+  event the recording belongs to. The title, attendees and description help
+  name the speakers and write the summary.
+- Both are off until you add them in Settings → Integrations. The JSON
+  contract and an example Google Calendar workflow are in
+  [docs/n8n-webhooks.md](docs/n8n-webhooks.md).
 
 **Library**
 - Markdown + JSON transcripts, tags, a glossary of words to spell right, and
@@ -62,9 +77,9 @@ The setup assistant on first launch asks which you want as the default and
 takes your keys; without a cloud key the app starts on local Whisper.
 
 Either way there's no telemetry and no account. Keys stay in your Keychain.
-Besides your chosen services, the app only downloads models from Hugging Face
-and checks this repository's GitHub Releases for updates once a day (turn it
-off in Settings → General → Updates).
+Besides your chosen services and any n8n webhooks you add, the app only
+downloads models from Hugging Face and checks this repository's GitHub
+Releases for updates once a day (turn it off in Settings → General → Updates).
 
 ## Install
 
@@ -162,7 +177,7 @@ MeetingTranscriber/
 ├── Capture/     # mic + system audio, process taps, meeting/call detection
 ├── Transcribe/  # Whisper, Parakeet, MAI, Scribe, diarization, pipeline
 ├── Summarize/   # MLX and Azure OpenAI summaries, prompts
-├── Storage/     # transcripts, tags, glossary, summaries, Keychain
+├── Storage/     # transcripts, tags, glossary, summaries, Keychain, n8n webhooks
 ├── MCP/         # local MCP server and tools
 ├── Models/      # shared model types
 ├── UI/          # SwiftUI views
