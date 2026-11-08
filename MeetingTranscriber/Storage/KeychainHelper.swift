@@ -46,7 +46,7 @@ enum KeychainHelper {
 }
 
 /// One API key kept as a generic password under the app's Keychain service.
-private struct StoredAPIKey {
+struct StoredAPIKey {
     private static let service = "com.czlonkowski.MeetingTranscriber"
     let account: String
 

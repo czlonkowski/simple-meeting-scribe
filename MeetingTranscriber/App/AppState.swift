@@ -162,6 +162,164 @@ final class AppState {
         AzureSpeechStore.saveAPIKey(azureSpeechKey)
     }
 
+    // MARK: – n8n webhook
+
+    /// Webhook URL and auth header for "Send to n8n". Kept untrimmed while the
+    /// user types (so "Bearer " keeps its space); trimmed when saved and sent.
+    var webhookURL: String = WebhookStore.loadURL()
+    var webhookHeaderName: String = WebhookStore.loadHeaderName()
+    var webhookHeaderValue: String = WebhookStore.loadHeaderValue()
+    /// Transcripts with a send in flight, to disable the button.
+    var webhookSendingIDs: Set<String> = []
+
+    var webhookConfig: WebhookConfig {
+        WebhookConfig(url: webhookURL, headerName: webhookHeaderName, headerValue: webhookHeaderValue)
+    }
+
+    func setWebhookURL(_ value: String) {
+        webhookURL = value
+        WebhookStore.saveURL(value)
+    }
+
+    func setWebhookHeaderName(_ value: String) {
+        webhookHeaderName = value
+        WebhookStore.saveHeaderName(value)
+    }
+
+    func setWebhookHeaderValue(_ value: String) {
+        webhookHeaderValue = value
+        WebhookStore.saveHeaderValue(value)
+    }
+
+    /// POST one transcript. On 2xx, records when and what was sent.
+    func sendToWebhook(documentID: String) async {
+        guard !webhookSendingIDs.contains(documentID),
+              let doc = transcripts.first(where: { $0.id == documentID }) else { return }
+        webhookSendingIDs.insert(documentID)
+        defer { webhookSendingIDs.remove(documentID) }
+
+        let envelope = WebhookEnvelope.exported(doc)
+        do {
+            try await WebhookClient.send(envelope, config: webhookConfig)
+        } catch is CancellationError {
+            return
+        } catch {
+            lastError = error.localizedDescription
+            return
+        }
+        guard let idx = transcripts.firstIndex(where: { $0.id == documentID }) else { return }
+        transcripts[idx].webhookSentAt = envelope.sentAt
+        transcripts[idx].webhookContentHash = envelope.transcript?.contentHash
+        try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+    }
+
+    // MARK: – Automatic follow-ups (summary, webhook)
+
+    /// Summarize each new transcript with the language's default model.
+    var autoSummarize: Bool = SummaryStore.loadAutoSummarize()
+    /// Send each new transcript to the webhook once it's ready.
+    var autoSendToWebhook: Bool = WebhookStore.loadAutoSend()
+
+    func setAutoSummarize(_ value: Bool) {
+        autoSummarize = value
+        SummaryStore.saveAutoSummarize(value)
+    }
+
+    func setAutoSendToWebhook(_ value: Bool) {
+        autoSendToWebhook = value
+        WebhookStore.saveAutoSend(value)
+    }
+
+    private var autoFollowUpQueue: [String] = []
+    private var autoFollowUpTask: Task<Void, Never>?
+
+    /// Queue the automatic summary and webhook send for a freshly saved
+    /// transcript. Runs one transcript at a time, summary before send, so
+    /// n8n gets the version with the summary.
+    private func enqueueAutoFollowUp(for documentID: String) {
+        guard autoSummarize || autoSendToWebhook else { return }
+        guard !autoFollowUpQueue.contains(documentID) else { return }
+        autoFollowUpQueue.append(documentID)
+        guard autoFollowUpTask == nil else { return }
+        autoFollowUpTask = Task { [weak self] in
+            while let self, !self.autoFollowUpQueue.isEmpty {
+                let id = self.autoFollowUpQueue.removeFirst()
+                await self.runAutoFollowUp(for: id)
+            }
+            self?.autoFollowUpTask = nil
+        }
+    }
+
+    private func runAutoFollowUp(for documentID: String) async {
+        if autoSummarize {
+            await waitForSummarizerIdle()
+            if let doc = transcripts.first(where: { $0.id == documentID }),
+               doc.summary == nil, !doc.segments.isEmpty,
+               canAutoSummarize(doc) {
+                Log.summary.notice("auto-summary: \(documentID, privacy: .public)")
+                summarize(transcriptID: documentID, isAutomatic: true)
+                await waitForSummarizerIdle()
+            }
+        }
+        if autoSendToWebhook, webhookConfig.isConfigured,
+           transcripts.contains(where: { $0.id == documentID }) {
+            await sendToWebhook(documentID: documentID)
+        }
+    }
+
+    /// A summary that would start a multi-GB model download is left to the
+    /// user; Azure models and downloaded local ones run unattended.
+    private func canAutoSummarize(_ doc: TranscriptDocument) -> Bool {
+        let model = doc.summaryModelOverride ?? defaultSummaryModel(for: doc.language)
+        if case .local(let local) = model, !downloadedModelIDs.contains(local.repoID) {
+            Log.summary.notice("auto-summary skipped: \(local.shortName, privacy: .public) is not downloaded")
+            return false
+        }
+        return true
+    }
+
+    /// `summarizeTask` is cleared by a separate main-actor task after the run
+    /// ends, so poll instead of awaiting it in a tight loop.
+    private func waitForSummarizerIdle() async {
+        while summarizeTask != nil {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+    }
+
+    // MARK: – Meeting lookup (calendar context before summarizing)
+
+    var meetingLookupEnabled: Bool = WebhookStore.loadLookupEnabled()
+    var meetingLookupURL: String = WebhookStore.loadLookupURL()
+
+    func setMeetingLookupEnabled(_ value: Bool) {
+        meetingLookupEnabled = value
+        WebhookStore.saveLookupEnabled(value)
+    }
+
+    func setMeetingLookupURL(_ value: String) {
+        meetingLookupURL = value
+        WebhookStore.saveLookupURL(value)
+    }
+
+    /// Lookup endpoint with the export webhook's auth header.
+    var meetingLookupWebhookConfig: WebhookConfig {
+        WebhookConfig(url: meetingLookupURL, headerName: webhookHeaderName, headerValue: webhookHeaderValue)
+    }
+
+    /// Config for a summarize run, or nil to skip the lookup. Automatic runs
+    /// only retry failed lookups; a manual run always asks again.
+    private func meetingLookupConfig(for doc: TranscriptDocument, isAutomatic: Bool) -> WebhookConfig? {
+        let config = meetingLookupWebhookConfig
+        guard meetingLookupEnabled, config.isConfigured else { return nil }
+        if isAutomatic, let status = doc.calendarLookup?.status, status != .failed { return nil }
+        return config
+    }
+
+    /// POST a `ping` event so the user can check URL and auth from Settings.
+    func sendWebhookTest() async throws {
+        try await WebhookClient.send(.ping(), config: webhookConfig)
+    }
+
     /// Azure Speech resource endpoint for MAI-Transcribe-2 (UserDefaults).
     var azureSpeechEndpoint: String = AzureSpeechStore.loadEndpoint()
 
@@ -497,10 +655,12 @@ final class AppState {
         customSummaryInstruction: String? = nil,
         model: SummaryModel? = nil,
         useGlossary: Bool = true,
-        inferSpeakerNames: Bool = true
+        inferSpeakerNames: Bool = true,
+        isAutomatic: Bool = false
     ) {
         guard let doc = transcripts.first(where: { $0.id == transcriptID }) else { return }
         guard summarizeTask == nil else { return }
+        let lookupConfig = meetingLookupConfig(for: doc, isAutomatic: isAutomatic)
 
         let language = doc.language
         let resolvedModel: SummaryModel = model
@@ -567,6 +727,26 @@ final class AppState {
                 }
             }
             do {
+                // Calendar event for this meeting, from the n8n lookup. A
+                // failed lookup keeps whatever was found before.
+                var calendarEvent = doc.calendarEvent
+                if let lookupConfig {
+                    let lookup = await MeetingLookup.lookup(doc, config: lookupConfig)
+                    try Task.checkCancellation()
+                    if lookup.status != .failed { calendarEvent = lookup.event }
+                    await MainActor.run {
+                        guard let self,
+                              let idx = self.transcripts.firstIndex(where: { $0.id == transcriptID })
+                        else { return }
+                        let previous = self.transcripts[idx].calendarLookup
+                        if lookup.status == .failed, previous?.status == .matched || previous?.status == CalendarLookup.Status.none {
+                            return
+                        }
+                        self.transcripts[idx].calendarLookup = lookup
+                        try? TranscriptStore.shared.save(self.transcripts[idx], audioSource: nil)
+                    }
+                }
+
                 if case .local(let local) = backend {
                     try await summaryEngine.ensureLoaded(local) { fraction in
                         Task { @MainActor in
@@ -631,10 +811,19 @@ final class AppState {
                     }
                     : []
                 if !remoteToInfer.isEmpty {
+                    let participants = calendarEvent.flatMap {
+                        CalendarPrompts.participantsBlock(for: language, event: $0,
+                                                          labelCount: remoteToInfer.count)
+                    }
+                    let knownSpeakers = workingSpeakers
+                        .map(\.name)
+                        .filter { (try? defaultRemoteRegex.wholeMatch(in: $0)) == nil && $0 != "You" }
                     let identifyPrompt = SummaryPrompts.identifyInstruction(
                         for: language,
-                        labels: remoteToInfer.map(\.name)
-                    ) + "\n\nTranscript:\n" + currentFeed
+                        labels: remoteToInfer.map(\.name),
+                        knownSpeakers: Array(Set(knownSpeakers)).sorted()
+                    ) + (participants.map { "\n\n" + $0 } ?? "")
+                      + "\n\nTranscript:\n" + currentFeed
                     let identifyStream = try await streamPass(.identifySpeakers, prompt: identifyPrompt)
                     var identifyRaw = ""
                     for try await chunk in identifyStream {
@@ -682,8 +871,12 @@ final class AppState {
                 let effectiveSummaryInstruction: String =
                     (summaryInstruction?.isEmpty == false ? summaryInstruction! :
                         SummaryPrompts.summaryInstruction(for: language))
+                let calendarContext = calendarEvent.map {
+                    "\n\n" + CalendarPrompts.contextBlock(for: language, event: $0)
+                } ?? ""
                 let summaryPrompt =
                     effectiveSummaryInstruction
+                    + calendarContext
                     + "\n\nTranscript:\n" + feed
                 let summaryStream = try await streamPass(.summary, prompt: summaryPrompt)
                 for try await chunk in summaryStream {
@@ -714,6 +907,7 @@ final class AppState {
                 // as the summary pass itself.
                 let titlePrompt =
                     SummaryPrompts.titleInstruction(for: language)
+                    + (calendarEvent.map { "\n" + CalendarPrompts.titleHint(for: language, event: $0) } ?? "")
                     + "\n\nSummary:\n"
                     + (finalizedSummary.isEmpty ? feed : finalizedSummary)
                 let titleStream = try await streamPass(.title, prompt: titlePrompt)
@@ -1466,6 +1660,9 @@ final class AppState {
             } else {
                 docToSave = freshDoc
                 docToSave.recordedAt = recordingDate
+                docToSave.recordingStartedAt = sourceKind == .live
+                    ? MeetingLookup.startFromAudioFileName(voiceURL.lastPathComponent)
+                    : recordingDate
             }
             if let videoURL {
                 docToSave.videoFileName = videoURL.lastPathComponent
@@ -1484,6 +1681,7 @@ final class AppState {
             await loadTranscripts()
             selectedTranscriptID = docToSave.id
             processingJobs.removeAll { $0.id == jobID }
+            enqueueAutoFollowUp(for: docToSave.id)
         } catch {
             // Cloud-engine errors already carry actionable, self-contained
             // messages; prefixing them with "Transcription failed:" reads doubly framed.
@@ -1522,7 +1720,11 @@ final class AppState {
             videoStartOffset: existing.videoStartOffset,
             summary: nil,
             summaryModelShortName: nil,
-            summaryGeneratedAt: nil
+            summaryGeneratedAt: nil,
+            webhookSentAt: existing.webhookSentAt,
+            webhookContentHash: existing.webhookContentHash,
+            recordingStartedAt: existing.recordingStartedAt,
+            calendarLookup: existing.calendarLookup
         )
     }
 

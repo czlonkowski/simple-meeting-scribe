@@ -15,9 +15,156 @@ struct SettingsView: View {
             Tab("Summary", systemImage: "sparkles") {
                 SummarySettingsView()
             }
+            Tab("Integrations", systemImage: "paperplane") {
+                IntegrationsSettingsView()
+            }
         }
         .scenePadding()
         .frame(minWidth: 620, minHeight: 520)
+    }
+}
+
+// MARK: – Integrations
+
+private struct IntegrationsSettingsView: View {
+    @Environment(AppState.self) private var appState
+
+    private enum TestState: Equatable {
+        case idle, sending, ok, failed(String)
+    }
+    @State private var testState: TestState = .idle
+    @State private var testTask: Task<Void, Never>?
+
+    private var urlWarning: String? {
+        let raw = appState.webhookURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, WebhookStore.validatedURL(raw) == nil else { return nil }
+        return "Use an https:// URL (http only for localhost)"
+    }
+
+    private var lookupURLWarning: String? {
+        let raw = appState.meetingLookupURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, WebhookStore.validatedURL(raw) == nil else { return nil }
+        return "Use an https:// URL (http only for localhost)"
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Webhook URL", text: Binding(
+                    get: { appState.webhookURL },
+                    set: { appState.setWebhookURL($0); resetTest() }
+                ), prompt: Text(verbatim: "https://n8n.example.com/webhook/…"))
+                if let urlWarning {
+                    Label(urlWarning, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+                TextField("Auth header name", text: Binding(
+                    get: { appState.webhookHeaderName },
+                    set: { appState.setWebhookHeaderName($0); resetTest() }
+                ), prompt: Text(verbatim: WebhookStore.defaultHeaderName))
+                SecureField("Auth header value", text: Binding(
+                    get: { appState.webhookHeaderValue },
+                    set: { appState.setWebhookHeaderValue($0); resetTest() }
+                ), prompt: Text(verbatim: "Bearer …"))
+                Toggle("Send new transcripts automatically", isOn: Binding(
+                    get: { appState.autoSendToWebhook },
+                    set: { appState.setAutoSendToWebhook($0) }
+                ))
+                .disabled(!appState.webhookConfig.isConfigured)
+                HStack(spacing: Theme.space4) {
+                    Button("Send test") {
+                        startTest()
+                    }
+                    .buttonStyle(.pressable)
+                    .disabled(!appState.webhookConfig.isConfigured || urlWarning != nil || testState == .sending)
+                    testStatusView
+                }
+            } header: {
+                Text("n8n webhook")
+                    .font(Theme.sectionTitleFont)
+            } footer: {
+                Text("""
+                    "Send to n8n" on a transcript POSTs JSON with the transcript, metadata, tags, \
+                    speakers and summary. Deduplicate on transcript.id; contentHash changes when the \
+                    content does. Automatic sending runs after the automatic summary, when that is on. \
+                    Set the n8n Webhook node to respond immediately. The URL and \
+                    header value are kept in the Keychain.
+                    """)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Look up the calendar event before summarizing", isOn: Binding(
+                    get: { appState.meetingLookupEnabled },
+                    set: { appState.setMeetingLookupEnabled($0) }
+                ))
+                TextField("Lookup webhook URL", text: Binding(
+                    get: { appState.meetingLookupURL },
+                    set: { appState.setMeetingLookupURL($0) }
+                ), prompt: Text(verbatim: "https://n8n.example.com/webhook/…"))
+                if let lookupURLWarning {
+                    Label(lookupURLWarning, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Meeting lookup")
+                    .font(Theme.sectionTitleFont)
+            } footer: {
+                Text("""
+                    Before each summary, POSTs the recording's start and end (event "meeting.lookup") and \
+                    expects { "events": [...] } from your calendar. The matched event's title, attendees \
+                    and description go to the speaker-naming and summary prompts. Uses the auth header \
+                    above; waits at most 8 s and summarizes without it on failure.
+                    """)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var testStatusView: some View {
+        switch testState {
+        case .idle:
+            EmptyView()
+        case .sending:
+            ProgressView().controlSize(.small)
+        case .ok:
+            Label("Webhook responded OK", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed(let message):
+            Label(message, systemImage: "xmark.octagon.fill")
+                .foregroundStyle(.red)
+                .lineLimit(3)
+                .textSelection(.enabled)
+        }
+    }
+
+    /// Editing the URL or header cancels a test in flight, so a result for
+    /// the old settings never shows up next to the new ones.
+    private func resetTest() {
+        testTask?.cancel()
+        testTask = nil
+        testState = .idle
+    }
+
+    private func startTest() {
+        testTask?.cancel()
+        testState = .sending
+        testTask = Task {
+            let result: TestState
+            do {
+                try await appState.sendWebhookTest()
+                result = .ok
+            } catch {
+                result = .failed(error.localizedDescription)
+            }
+            guard !Task.isCancelled else { return }
+            testState = result
+            testTask = nil
+        }
     }
 }
 
@@ -541,11 +688,15 @@ private struct SummarySettingsView: View {
             Section {
                 defaultModelPicker("English", language: .english)
                 defaultModelPicker("Polish", language: .polish)
+                Toggle("Summarize new transcripts automatically", isOn: Binding(
+                    get: { appState.autoSummarize },
+                    set: { appState.setAutoSummarize($0) }
+                ))
             } header: {
                 Text("Default model per language")
                     .font(Theme.sectionTitleFont)
             } footer: {
-                Text("The matching model is used automatically based on the transcript's language.")
+                Text("The matching model is used automatically based on the transcript's language. Automatic summaries skip local models that aren't downloaded yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

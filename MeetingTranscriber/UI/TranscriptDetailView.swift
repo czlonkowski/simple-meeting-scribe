@@ -107,6 +107,7 @@ struct TranscriptDetailView: View {
                 if TranscriptStore.shared.audioURL(for: doc) != nil {
                     mixedAudioExportButton(for: doc)
                 }
+                WebhookSendButton(doc: doc)
             }
             .padding(Theme.space12)
         }
@@ -171,6 +172,10 @@ struct TranscriptDetailView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            if let event = doc.calendarEvent {
+                calendarEventLabel(event)
+            }
+
             if doc.hasPartialSystemCapture, let silent = doc.systemAudioSilentFraction {
                 Label {
                     Text("Partial capture — no system audio for \(Int((silent * 100).rounded()))% of this recording. The other participants are likely missing from parts of the transcript.")
@@ -182,6 +187,25 @@ struct TranscriptDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// Calendar event the lookup matched, so a wrong match is visible.
+    private func calendarEventLabel(_ event: CalendarEvent) -> some View {
+        let names = event.participantNames
+        let time = event.start.formatted(date: .omitted, time: .shortened)
+        return Label {
+            Text(names.isEmpty
+                 ? "\(event.title) · \(time)"
+                 : "\(event.title) · \(time) · \(names.count) invited")
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: "calendar.badge.checkmark")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .help(names.isEmpty
+              ? "Calendar event used for the summary"
+              : "Calendar event used for the summary. Invited: \(names.joined(separator: ", "))")
     }
 
     /// Recording date shows date-only (it's day-level); the transcription-date

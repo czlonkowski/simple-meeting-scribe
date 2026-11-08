@@ -19,7 +19,8 @@ enum SummaryPrompts {
     /// "Remote 1", …) to real names mentioned in the conversation. Strict
     /// output format so `parseInferredNames` can read it back deterministically.
     static func identifyInstruction(for language: TranscriptionLanguage,
-                                    labels: [String]) -> String {
+                                    labels: [String],
+                                    knownSpeakers: [String] = []) -> String {
         let intro: String
         let unknown: String
         switch language {
@@ -32,7 +33,27 @@ enum SummaryPrompts {
         }
         let format = "<label>: <name or unknown>"
         let bullets = labels.map { "- \($0)" }.joined(separator: "\n")
-        return "\(intro)\n\(format)\n\(unknown)\n\nLabels to identify:\n\(bullets)"
+        return "\(intro)\n\(format)\n\(unknown)\n\(namingRules(for: language, knownSpeakers: knownSpeakers))\n\nLabels to identify:\n\(bullets)"
+    }
+
+    /// Keeps names unique: no second "Piotr", no "Romek" for a user already
+    /// labelled "Romuald".
+    private static func namingRules(for language: TranscriptionLanguage, knownSpeakers: [String]) -> String {
+        let known = knownSpeakers.joined(separator: ", ")
+        switch language {
+        case .english:
+            var rules = "Give different labels different names unless they are clearly the same person; if two people share a first name, add the surname."
+            if !known.isEmpty {
+                rules += " Already identified speakers: \(known). Don't give a label one of these names or a nickname/diminutive of it (e.g. Romek for Romuald), unless the label is clearly that same person — then write the name exactly as listed."
+            }
+            return rules
+        case .polish:
+            var rules = "Różnym etykietom daj różne imiona, chyba że to wyraźnie ta sama osoba; jeśli dwie osoby mają to samo imię, dodaj nazwisko."
+            if !known.isEmpty {
+                rules += " Już zidentyfikowani mówcy: \(known). Nie dawaj etykiecie żadnego z tych imion ani ich zdrobnienia (np. Romek dla Romualda), chyba że to wyraźnie ta sama osoba — wtedy wpisz imię dokładnie tak, jak na liście."
+            }
+            return rules
+        }
     }
 
     /// Parses lines like "Remote 1: Romek" / "Remote 2: unknown" produced by

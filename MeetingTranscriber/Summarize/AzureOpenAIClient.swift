@@ -334,14 +334,3 @@ struct AzureOpenAIClient: Sendable {
         return events
     }
 }
-
-/// Refuses HTTP redirects so the `api-key` header is only ever sent to the
-/// configured resource.
-private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
-    func urlSession(_ session: URLSession,
-                    task: URLSessionTask,
-                    willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest) async -> URLRequest? {
-        nil
-    }
-}

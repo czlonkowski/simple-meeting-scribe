@@ -91,6 +91,17 @@ enum SummaryStore {
         UserDefaults.standard.set(data, forKey: azureDeploymentsKey)
     }
 
+    private static let autoSummarizeKey = "Summary.AutoSummarize"
+
+    /// Summarize every new transcript with the language's default model.
+    static func loadAutoSummarize() -> Bool {
+        UserDefaults.standard.bool(forKey: autoSummarizeKey)
+    }
+
+    static func saveAutoSummarize(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: autoSummarizeKey)
+    }
+
     static func loadUserDisplayName() -> String {
         UserDefaults.standard.string(forKey: userDisplayNameKey) ?? ""
     }

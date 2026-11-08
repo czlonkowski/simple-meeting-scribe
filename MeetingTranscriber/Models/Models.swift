@@ -213,6 +213,25 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     /// regenerated summary never re-corrects already corrected speakers.
     var speakersCorrectedAt: Date? = nil
 
+    /// Last successful send to the n8n webhook, and the `contentHash` that was
+    /// sent, so the UI can tell "sent" from "changed since sent". Not part of
+    /// the webhook payload.
+    var webhookSentAt: Date? = nil
+    var webhookContentHash: String? = nil
+
+    /// Exact moment the recording began. Set when a live recording is saved
+    /// and from an import's media date; nil for older transcripts. Unlike
+    /// `recordedAt` (a user-editable, day-level date) this keeps the time,
+    /// which the calendar lookup needs.
+    var recordingStartedAt: Date? = nil
+    /// Calendar event found for this meeting by the n8n lookup, if any.
+    var calendarLookup: CalendarLookup? = nil
+
+    /// The matched calendar event, when the lookup found one.
+    var calendarEvent: CalendarEvent? {
+        calendarLookup?.status == .matched ? calendarLookup?.event : nil
+    }
+
     /// Date to display and sort by: the real recording date when known,
     /// otherwise the transcription date.
     var displayDate: Date { recordedAt ?? date }
@@ -247,6 +266,7 @@ extension TranscriptDocument {
         audioFileName = try c.decodeIfPresent(String.self, forKey: .audioFileName)
         videoFileName = try c.decodeIfPresent(String.self, forKey: .videoFileName)
         videoStartOffset = try c.decodeIfPresent(Double.self, forKey: .videoStartOffset)
+        systemAudioSilentFraction = try c.decodeIfPresent(Double.self, forKey: .systemAudioSilentFraction)
         summary = try c.decodeIfPresent(String.self, forKey: .summary)
         summaryModelShortName = try c.decodeIfPresent(String.self, forKey: .summaryModelShortName)
         summaryGeneratedAt = try c.decodeIfPresent(Date.self, forKey: .summaryGeneratedAt)
@@ -254,5 +274,9 @@ extension TranscriptDocument {
         // which `try?` turns into nil; absent key also yields nil.
         summaryModelOverride = (try? c.decodeIfPresent(SummaryModel.self, forKey: .summaryModelOverride)) ?? nil
         speakersCorrectedAt = try c.decodeIfPresent(Date.self, forKey: .speakersCorrectedAt)
+        webhookSentAt = try c.decodeIfPresent(Date.self, forKey: .webhookSentAt)
+        webhookContentHash = try c.decodeIfPresent(String.self, forKey: .webhookContentHash)
+        recordingStartedAt = try c.decodeIfPresent(Date.self, forKey: .recordingStartedAt)
+        calendarLookup = (try? c.decodeIfPresent(CalendarLookup.self, forKey: .calendarLookup)) ?? nil
     }
 }
