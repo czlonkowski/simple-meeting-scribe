@@ -166,6 +166,8 @@ struct WebhookTranscript: Encodable, Equatable {
     let speakers: [Speaker]
     /// Calendar event matched by the meeting lookup, nil when none.
     let calendarEvent: CalendarEvent?
+    /// The other side of an iPhone call, nil for anything else.
+    let phoneCall: PhoneCallInfo?
     let segments: [Segment]
     private(set) var markdown: String
     let summary: Summary?
@@ -186,6 +188,7 @@ struct WebhookTranscript: Encodable, Equatable {
         tags = doc.tags
         speakers = doc.speakers.map { Speaker(id: $0.id, name: $0.name) }
         calendarEvent = doc.calendarEvent
+        phoneCall = doc.phoneCall
         let names = Dictionary(doc.speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         segments = doc.segments.map {
             Segment(start: $0.start, end: $0.end, speakerId: $0.speakerId,
@@ -221,7 +224,7 @@ struct WebhookTranscript: Encodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case id, contentHash, title, createdAt, recordedAt, durationSec, language, engine,
-             sourceKind, sourceURL, tags, speakers, calendarEvent, segments, markdown, summary, flags
+             sourceKind, sourceURL, tags, speakers, calendarEvent, phoneCall, segments, markdown, summary, flags
     }
 
     /// Wire order for n8n; see `WebhookEnvelope.wireData()`.
@@ -241,6 +244,7 @@ struct WebhookTranscript: Encodable, Equatable {
         try o.add("flags", flags)
         try o.add("speakers", speakers)
         try o.add("calendarEvent", calendarEvent)
+        try o.add("phoneCall", phoneCall)
         try o.add("summary", summary)
         try o.add("markdown", markdown)
         try o.add("segments", segments)
@@ -265,6 +269,7 @@ struct WebhookTranscript: Encodable, Equatable {
         // IfPresent: transcripts without an event keep the hash they had
         // before this field existed.
         try c.encodeIfPresent(calendarEvent, forKey: .calendarEvent)
+        try c.encodeIfPresent(phoneCall, forKey: .phoneCall)
         try c.encode(summary, forKey: .summary)
         try c.encode(markdown, forKey: .markdown)
         try c.encode(segments, forKey: .segments)

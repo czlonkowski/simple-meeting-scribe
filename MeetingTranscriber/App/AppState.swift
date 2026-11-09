@@ -194,9 +194,21 @@ final class AppState {
     /// POST one transcript. On 2xx, records when and what was sent.
     func sendToWebhook(documentID: String) async {
         guard !webhookSendingIDs.contains(documentID),
-              let doc = transcripts.first(where: { $0.id == documentID }) else { return }
+              var doc = transcripts.first(where: { $0.id == documentID }) else { return }
         webhookSendingIDs.insert(documentID)
         defer { webhookSendingIDs.remove(documentID) }
+
+        // iPhone call: add the other side's number from the call history,
+        // so n8n can find the person. Retried on every send until found.
+        if doc.phoneCall == nil, PhoneCallLookup.isPhoneCall(doc) {
+            let snapshot = doc
+            let call = await Task.detached { PhoneCallLookup.lookup(for: snapshot) }.value
+            if let call, let idx = transcripts.firstIndex(where: { $0.id == documentID }) {
+                transcripts[idx].phoneCall = call
+                try? TranscriptStore.shared.save(transcripts[idx], audioSource: nil)
+                doc = transcripts[idx]
+            }
+        }
 
         let envelope = WebhookEnvelope.exported(doc)
         do {

@@ -226,6 +226,8 @@ struct TranscriptDocument: Codable, Identifiable, Hashable, Sendable {
     var recordingStartedAt: Date? = nil
     /// Calendar event found for this meeting by the n8n lookup, if any.
     var calendarLookup: CalendarLookup? = nil
+    /// Number and direction of an iPhone call, from the macOS call history.
+    var phoneCall: PhoneCallInfo? = nil
 
     /// The matched calendar event, when the lookup found one.
     var calendarEvent: CalendarEvent? {
@@ -278,5 +280,6 @@ extension TranscriptDocument {
         webhookContentHash = try c.decodeIfPresent(String.self, forKey: .webhookContentHash)
         recordingStartedAt = try c.decodeIfPresent(Date.self, forKey: .recordingStartedAt)
         calendarLookup = (try? c.decodeIfPresent(CalendarLookup.self, forKey: .calendarLookup)) ?? nil
+        phoneCall = (try? c.decodeIfPresent(PhoneCallInfo.self, forKey: .phoneCall)) ?? nil
     }
 }
