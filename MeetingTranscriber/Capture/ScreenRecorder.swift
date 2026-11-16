@@ -213,7 +213,7 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     /// A file only counts if it has a video track with non-zero duration —
     /// this is the single gate deciding whether `videoFileName` ever reaches
     /// the saved document.
-    private static func isPlayableVideo(_ url: URL) async -> Bool {
+    static func isPlayableVideo(_ url: URL) async -> Bool {
         guard FileManager.default.fileExists(atPath: url.path) else { return false }
         let asset = AVURLAsset(url: url)
         guard let tracks = try? await asset.loadTracks(withMediaType: .video),

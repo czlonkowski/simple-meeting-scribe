@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 enum SidebarItem: Hashable {
     case record
     case transcript(String)
+    /// A recording on disk without a transcript, by stem base name.
+    case pending(String)
 }
 
 struct RootView: View {
@@ -166,6 +168,24 @@ struct RootView: View {
                     .tag(SidebarItem.record)
             }
 
+            let pending = appState.visiblePendingRecordings
+            if !pending.isEmpty {
+                Section("Not transcribed") {
+                    ForEach(pending) { recording in
+                        PendingRecordingRow(pending: recording)
+                            .tag(SidebarItem.pending(recording.id))
+                            .contextMenu {
+                                Button("Reveal in Finder") {
+                                    NSWorkspace.shared.activateFileViewerSelecting([
+                                        TranscriptStore.shared.recordingsDir
+                                            .appendingPathComponent(recording.voiceFileName)
+                                    ])
+                                }
+                            }
+                    }
+                }
+            }
+
             if !appState.transcripts.isEmpty {
                 Section("Transcripts") {
                     ForEach(filteredTranscripts) { doc in
@@ -276,6 +296,9 @@ struct RootView: View {
             RecordView()
         case .transcript(let id):
             TranscriptDetailView(documentID: id)
+                .id(id)
+        case .pending(let id):
+            PendingRecordingDetailView(pendingID: id)
                 .id(id)
         }
     }

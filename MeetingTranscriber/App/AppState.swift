@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 import AppKit
+import AVFoundation
 
 private let recordScreenKey = "recordScreenByDefault"
 private let inputDeviceUIDKey = "preferredInputDeviceUID"
@@ -1105,6 +1106,40 @@ final class AppState {
     // MARK: – Library
     var transcripts: [TranscriptDocument] = []
     var selectedTranscriptID: String? = nil
+    /// Live recordings on disk without a transcript, as last scanned. Use
+    /// `visiblePendingRecordings` for display.
+    var pendingRecordings: [PendingRecording] = []
+    /// Voice-stem filenames some in-app flow owns right now: the recording in
+    /// progress, and every queued or running job for a new recording. Claimed
+    /// at recording start (or on Transcribe) and released only after the
+    /// transcript is in `transcripts` or the failure is recorded, so a stem is
+    /// never shown as "not transcribed" while it is still on its way.
+    private(set) var claimedStems: Set<String> = []
+    /// Claimed stems the user chose to transcribe from the pending list. They
+    /// stay listed (showing progress) until the transcript replaces them.
+    private(set) var recoveringStems: Set<String> = []
+
+    /// Pending recordings minus anything claimed or already transcribed.
+    /// Filtered here rather than at scan time so a scan that raced with a
+    /// recording or a save can't show a stem that is in flight.
+    var visiblePendingRecordings: [PendingRecording] {
+        let referenced = PendingRecordingStore.referencedVoiceFiles(in: transcripts)
+        return pendingRecordings.filter {
+            let stem = $0.voiceFileName
+            return (!claimedStems.contains(stem) || recoveringStems.contains(stem))
+                && !referenced.contains(stem)
+        }
+    }
+
+    /// The queued or running job transcribing a pending recording, if any.
+    func recoveryJob(for pending: PendingRecording) -> ProcessingJob? {
+        processingJobs.first {
+            if case .liveStems(let v, _, _, _, _) = $0.input {
+                return v.lastPathComponent == pending.voiceFileName
+            }
+            return false
+        }
+    }
     var tagCatalog: [Tag] = []
 
     // MARK: – UI triggers
@@ -1170,6 +1205,16 @@ final class AppState {
         } catch {
             self.lastError = "Could not load transcripts: \(error.localizedDescription)"
         }
+        await refreshPendingRecordings()
+    }
+
+    /// Rescan recordings/ for live recordings that have no transcript.
+    func refreshPendingRecordings() async {
+        let recordingsDir = TranscriptStore.shared.recordingsDir
+        let referenced = PendingRecordingStore.referencedVoiceFiles(in: transcripts)
+        pendingRecordings = await Task.detached(priority: .utility) {
+            PendingRecordingStore.scan(recordingsDir: recordingsDir, referencedVoiceFiles: referenced)
+        }.value
     }
 
     // MARK: – Meeting detection
@@ -1292,6 +1337,18 @@ final class AppState {
             )
             currentInputDeviceName = coord.activeInputDeviceName()
             let start = Date()
+            if let voiceURL = coord.voiceURL {
+                claimedStems.insert(voiceURL.lastPathComponent)
+                // Written now so a crash mid-recording keeps the title and language.
+                PendingRecordingStore.writeSidecar(RecordingSidecar(
+                    title: jobTitle(for: meeting, startedAt: start),
+                    language: language,
+                    startedAt: start,
+                    meetingTitle: meeting?.title,
+                    meetingPlatform: meeting?.platform,
+                    meetingURL: meeting?.url
+                ), forVoiceURL: voiceURL)
+            }
             recordingState = .recording(startedAt: start, meeting: meeting, language: language)
             elapsedSeconds = 0
             longRecordingAlert = LongRecordingAlert()
@@ -1324,6 +1381,9 @@ final class AppState {
     func setRecordingLanguage(_ language: TranscriptionLanguage) {
         guard case .recording(let startedAt, let meeting, _) = recordingState else { return }
         recordingState = .recording(startedAt: startedAt, meeting: meeting, language: language)
+        if let voiceURL = recorder?.voiceURL {
+            PendingRecordingStore.updateSidecar(forVoiceURL: voiceURL) { $0.language = language }
+        }
     }
 
     func setMicMuted(_ muted: Bool) {
@@ -1421,6 +1481,9 @@ final class AppState {
             systemAudioStatus = .ok
             micStatus = .ok
             let duration = Date().timeIntervalSince(startedAt)
+            PendingRecordingStore.updateSidecar(forVoiceURL: stems.voiceURL) {
+                $0.videoStartOffset = stems.videoStartOffset
+            }
             let job = ProcessingJob(
                 id: UUID(),
                 title: jobTitle(for: meeting, startedAt: startedAt),
@@ -1444,6 +1507,11 @@ final class AppState {
             recordingState = .idle
             videoCaptureStatus = .off
             lastError = "Stop failed: \(error.localizedDescription)"
+            // Whatever reached disk is now a pending recording.
+            if let voiceURL = recorder.voiceURL {
+                claimedStems.remove(voiceURL.lastPathComponent)
+            }
+            await refreshPendingRecordings()
         }
     }
 
@@ -1607,6 +1675,20 @@ final class AppState {
         let videoStartOffset: TimeInterval?
         var recordingDate: Date? = nil   // imports only; live recordings use `date`
 
+        // A new live recording (not a re-transcription) holds a claim on its
+        // stem; release it once the outcome is visible either way. `defer`
+        // so no exit path can leave the recording hidden until relaunch.
+        var newRecordingVoiceURL: URL? = nil
+        if case .liveStems(let v, _, _, _, _) = job.input, job.replacingDocumentID == nil {
+            newRecordingVoiceURL = v
+        }
+        defer {
+            if let newRecordingVoiceURL {
+                claimedStems.remove(newRecordingVoiceURL.lastPathComponent)
+                recoveringStems.remove(newRecordingVoiceURL.lastPathComponent)
+            }
+        }
+
         do {
             switch job.input {
             case .liveStems(let v, let s, let d, let video, let videoOffset):
@@ -1690,6 +1772,9 @@ final class AppState {
                 }.value
             }
             try TranscriptStore.shared.save(docToSave, audioSource: voiceURL)
+            if let newRecordingVoiceURL {
+                PendingRecordingStore.deleteSidecar(forVoiceURL: newRecordingVoiceURL)
+            }
             await loadTranscripts()
             selectedTranscriptID = docToSave.id
             processingJobs.removeAll { $0.id == jobID }
@@ -1704,7 +1789,123 @@ final class AppState {
             }
             // Drop the failed job from the queue so the drain continues.
             processingJobs.removeAll { $0.id == jobID }
+            // The stems stay on disk as a pending recording, with the reason.
+            if let newRecordingVoiceURL, let message = lastError {
+                recordFailure(message, forVoiceURL: newRecordingVoiceURL,
+                              language: language, meeting: meeting)
+                await refreshPendingRecordings()
+            }
         }
+    }
+
+    // MARK: – Pending (untranscribed) recordings
+
+    /// Store a failed attempt's reason in the recording's sidecar, creating
+    /// one for recordings made before sidecars existed.
+    private func recordFailure(_ message: String, forVoiceURL voiceURL: URL,
+                               language: TranscriptionLanguage, meeting: DetectedMeeting?) {
+        var sidecar = PendingRecordingStore.readSidecar(forVoiceURL: voiceURL)
+            ?? RecordingSidecar(
+                title: meeting?.title ?? PendingRecording.fallbackTitle(
+                    for: MeetingLookup.startFromAudioFileName(voiceURL.lastPathComponent) ?? Date()),
+                language: language,
+                startedAt: MeetingLookup.startFromAudioFileName(voiceURL.lastPathComponent) ?? Date(),
+                meetingTitle: meeting?.title,
+                meetingPlatform: meeting?.platform,
+                meetingURL: meeting?.url
+            )
+        sidecar.lastError = message
+        sidecar.lastErrorAt = Date()
+        PendingRecordingStore.writeSidecar(sidecar, forVoiceURL: voiceURL)
+    }
+
+    /// Queue transcription of a recovered recording. Only ever called from
+    /// the user's Transcribe action: recovered recordings never start on
+    /// their own.
+    func transcribePending(id: String, language: TranscriptionLanguage, model: WhisperModel? = nil) {
+        guard let pending = visiblePendingRecordings.first(where: { $0.id == id }),
+              !claimedStems.contains(pending.voiceFileName) else { return }
+        // Claim synchronously so a double click can't queue it twice.
+        claimedStems.insert(pending.voiceFileName)
+        recoveringStems.insert(pending.voiceFileName)
+        Task { await enqueueRecovered(pending, language: language, model: model) }
+    }
+
+    private func enqueueRecovered(_ pending: PendingRecording,
+                                  language: TranscriptionLanguage,
+                                  model: WhisperModel?) async {
+        do {
+            guard let stems = await Self.repairedStems(for: pending) else {
+                throw WAVHeaderRepair.RepairError.noDataChunk
+            }
+            var videoURL: URL? = nil
+            let offset = pending.sidecar?.videoStartOffset
+            if let name = pending.videoFileName, offset != nil {
+                let url = TranscriptStore.shared.recordingsDir.appendingPathComponent(name)
+                if await ScreenRecorder.isPlayableVideo(url) { videoURL = url }
+            }
+            enqueueJob(ProcessingJob(
+                id: UUID(),
+                title: pending.title,
+                input: .liveStems(voiceURL: stems.voice,
+                                  systemURL: stems.system,
+                                  duration: stems.duration,
+                                  videoURL: videoURL,
+                                  videoStartOffset: videoURL != nil ? offset : nil),
+                language: language,
+                meeting: pending.sidecar?.meeting,
+                sourceKind: .live,
+                importedName: nil,
+                replacingDocumentID: nil,
+                modelOverride: model,
+                stage: .queued,
+                createdAt: Date()
+            ))
+        } catch {
+            claimedStems.remove(pending.voiceFileName)
+            recoveringStems.remove(pending.voiceFileName)
+            lastError = "Can't transcribe “\(pending.title)”: \(error.localizedDescription)"
+        }
+    }
+
+    /// Fix the stems' headers (a crash mid-recording leaves them claiming zero
+    /// samples) and measure the audio. Patches only the two size fields, in
+    /// place and idempotently. Returns nil when the voice stem is unusable; a
+    /// broken system stem is dropped rather than failing the recording.
+    static func repairedStems(for pending: PendingRecording) async
+        -> (voice: URL, system: URL?, duration: TimeInterval)? {
+        let dir = TranscriptStore.shared.recordingsDir
+        let voice = dir.appendingPathComponent(pending.voiceFileName)
+        let system = pending.systemFileName.map { dir.appendingPathComponent($0) }
+        return await Task.detached(priority: .userInitiated) {
+            do {
+                try WAVHeaderRepair.repairIfNeeded(at: voice)
+                let file = try AVAudioFile(forReading: voice)
+                let duration = Double(file.length) / file.fileFormat.sampleRate
+                guard duration > 0 else { return nil }
+                var usableSystem: URL? = nil
+                if let system {
+                    do {
+                        try WAVHeaderRepair.repairIfNeeded(at: system)
+                        usableSystem = system
+                    } catch {
+                        Log.recorder.error("recovered system stem unusable: \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+                return (voice, usableSystem, duration)
+            } catch {
+                Log.recorder.error("recovered voice stem unusable: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+        }.value
+    }
+
+    /// Delete a pending recording's stems, video and sidecar.
+    func deletePendingRecording(id: String) {
+        guard let pending = pendingRecordings.first(where: { $0.id == id }),
+              !claimedStems.contains(pending.voiceFileName) else { return }
+        PendingRecordingStore.delete(pending, in: TranscriptStore.shared.recordingsDir)
+        pendingRecordings.removeAll { $0.id == id }
     }
 
     /// Build the document we'll save after re-transcribing `existing`. Keeps

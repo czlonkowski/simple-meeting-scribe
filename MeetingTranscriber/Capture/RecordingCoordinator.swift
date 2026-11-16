@@ -21,6 +21,8 @@ final class RecordingCoordinator {
     private var writer: StemWriter?
     private var captureSystem = false
     private var baseURL: URL?
+    /// The mic stem being written, known once `start` has created it.
+    private(set) var voiceURL: URL?
     private var micStartDate: Date?
     private var videoStartOffset: TimeInterval?
     private var onVideoStatus: ((VideoCaptureStatus) -> Void)?
@@ -41,6 +43,7 @@ final class RecordingCoordinator {
         let writer = try StemWriter(baseURL: baseURL)
         self.writer = writer
         self.baseURL = baseURL
+        self.voiceURL = writer.voiceURL
         self.captureSystem = captureSystemAudio
         self.onVideoStatus = onVideoStatus
 
