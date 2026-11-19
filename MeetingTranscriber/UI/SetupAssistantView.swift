@@ -167,7 +167,7 @@ struct SetupAssistantView: View {
         @Bindable var state = appState
         return VStack(alignment: .leading, spacing: Theme.space8) {
             title("Meetings and calls",
-                  "Meetings in Arc, Safari or Chrome are detected and you're asked to record. Calls can start recording by themselves.")
+                  "Meetings in Dia, Arc, Safari or Chrome are detected and you're asked to record. Calls can start recording by themselves.")
             Form {
                 Picker("Usual meeting language", selection: $language) {
                     ForEach(TranscriptionLanguage.allCases) { l in
@@ -325,7 +325,7 @@ private struct PermissionsStep: View {
                     }
                 }
             }
-            Text("Arc, Safari and Chrome each ask for Automation access when the app first looks for a meeting tab. iPhone calls ask for System Audio Recording on the first call.")
+            Text("Dia, Arc, Safari and Chrome each ask for Automation access when the app first looks for a meeting tab. iPhone calls ask for System Audio Recording on the first call.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

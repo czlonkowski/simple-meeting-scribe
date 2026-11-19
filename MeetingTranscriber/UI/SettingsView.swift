@@ -254,7 +254,7 @@ private struct GeneralSettingsView: View {
                         Text("Not connected: \(uid)").tag(uid)
                     }
                 }
-                Toggle("Include Arc system audio by default", isOn: $state.captureSystemAudio)
+                Toggle("Include system audio by default", isOn: $state.captureSystemAudio)
                 Toggle("Record meeting screen by default", isOn: Binding(
                     get: { state.recordScreen },
                     set: { state.setRecordScreen($0) }

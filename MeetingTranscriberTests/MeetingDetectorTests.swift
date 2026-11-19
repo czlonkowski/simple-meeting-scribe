@@ -20,6 +20,24 @@ final class MeetingDetectorTests: XCTestCase {
     )
 
     @MainActor
+    func testDiaIsDetectedAndScriptedLikeArc() {
+        let dia = MeetingDetector.defaultBrowsers.first { $0.bundleID == "company.thebrowser.dia" }
+        XCTAssertNotNil(dia)
+        XCTAssertTrue(dia?.scriptSource.contains("tell application \"Dia\"") ?? false)
+        XCTAssertTrue(dia?.scriptSource.contains("URL of active tab of front window") ?? false)
+    }
+
+    /// A browser the detector polls but the screen recorder doesn't know
+    /// records audio with no video ("No meeting window found").
+    @MainActor
+    func testScreenRecorderCoversEveryDetectedBrowser() {
+        let recordable = Set(ScreenRecorder.browserBundleIDs)
+        for browser in MeetingDetector.defaultBrowsers {
+            XCTAssertTrue(recordable.contains(browser.bundleID), "\(browser.name) has no screen capture")
+        }
+    }
+
+    @MainActor
     func testTimedOutSafariDoesNotBlockChromeDetection() async throws {
         let query = FakeBrowserQuery(results: [
             arc.bundleID: .noURL,

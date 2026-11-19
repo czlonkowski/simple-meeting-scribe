@@ -15,6 +15,17 @@ final class MeetingDetector {
 
     static let defaultBrowsers: [BrowserDescriptor] = [
         BrowserDescriptor(
+            name: "Dia",
+            bundleID: "company.thebrowser.dia",
+            scriptSource: """
+            tell application "Dia"
+                if not running then return ""
+                if (count of windows) = 0 then return ""
+                return URL of active tab of front window
+            end tell
+            """
+        ),
+        BrowserDescriptor(
             name: "Arc",
             bundleID: "company.thebrowser.Browser",
             scriptSource: """

@@ -109,7 +109,7 @@ targets:
         NSHumanReadableCopyright: "© 2026 Romuald Członkowski"
         NSMicrophoneUsageDescription: "Meeting Transcriber records your microphone while you record a meeting."
         NSAudioCaptureUsageDescription: "Meeting Transcriber records the other side of phone and FaceTime calls you take on this Mac."
-        NSAppleEventsUsageDescription: "Meeting Transcriber asks Arc, Safari, and Chrome for the current tab URL to detect meetings you join."
+        NSAppleEventsUsageDescription: "Meeting Transcriber asks Dia, Arc, Safari, and Chrome for the current tab URL to detect meetings you join."
         NSDesktopFolderUsageDescription: "Needed only if you import files from the Desktop."
         NSDocumentsFolderUsageDescription: "Meeting Transcriber saves transcripts to your Documents folder."
         NSDownloadsFolderUsageDescription: "Meeting Transcriber saves mixed audio to and imports media from your Downloads folder."

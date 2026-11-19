@@ -14,8 +14,8 @@ it, reshape it — it's yours.
 ## What it does
 
 **Record**
-- Spots a Google Meet / Zoom / Teams / Whereby / Jitsi meeting open in Arc,
-  Safari or Chrome and offers to record it.
+- Spots a Google Meet / Zoom / Teams / Whereby / Jitsi meeting open in Dia,
+  Arc, Safari or Chrome and offers to record it.
 - Records native calls on its own: WhatsApp, iPhone calls taken on the Mac,
   Signal, Telegram, and the Zoom, Teams and Slack apps. WhatsApp and iPhone
   recordings stop when you hang up.
@@ -101,7 +101,7 @@ never during a recording. Maintainers: see [the release guide](docs/releases.md)
 | Microphone | Your side of the meeting |
 | Screen & System Audio Recording | The meeting's audio, and window video if you turn it on |
 | System Audio Recording Only | The other side of iPhone and FaceTime calls |
-| Automation (per browser) | Reading the current tab URL in Arc, Safari or Chrome to spot meetings |
+| Automation (per browser) | Reading the current tab URL in Dia, Arc, Safari or Chrome to spot meetings |
 | Notifications | "Recording…", "Meeting ended?" and long-recording notices |
 
 ## Requirements

@@ -31,7 +31,10 @@ final class ScreenRecorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegat
     private var outputURL: URL?
     private var isTearingDown = false
 
-    private static let browserBundleIDs = [
+    /// Must cover every browser in `MeetingDetector.defaultBrowsers`, or a
+    /// manual recording in that browser finds no window to capture.
+    static let browserBundleIDs = [
+        "company.thebrowser.dia",      // Dia
         "company.thebrowser.Browser",  // Arc
         "com.apple.Safari",
         "com.google.Chrome",
